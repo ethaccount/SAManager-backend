@@ -35,7 +35,10 @@ func NewApplication(ctx context.Context, config ApplicationConfig) *Application 
 		log.Fatalf("failed to create passkey service: %v", err)
 	}
 
+	// pollingService.start()
+
 	return &Application{
 		PasskeyService: passkeyService,
+		// ExecutionService: executionService,
 	}
 }

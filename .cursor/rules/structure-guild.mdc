@@ -1,0 +1,72 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Structure Guide
+
+## Service Layer Architecture
+This project follows a clean architecture pattern with clear separation of concerns:
+
+- **Entry Points**: Application starts from [cmd/server/main.go](mdc:cmd/server/main.go) which initializes configuration, logging, and dependency injection
+- **Handler Layer**: HTTP handlers in [src/handler/](mdc:src/handler) manage API endpoints, request/response processing, and middleware
+- **Service Layer**: Business logic resides in [src/service/](mdc:src/service) with [src/service/app.go](mdc:src/service/app.go) as the main application service
+- **Repository Layer**: Data access layer in [src/repository/](mdc:src/repository) handles database operations using GORM
+- **Domain Layer**: Core entities and business rules in [src/domain/](mdc:src/domain) including models and domain-specific errors
+
+## Data Flow Architecture
+Data flows through the application in this pattern:
+1. **HTTP Request** → [src/handler/](mdc:src/handler) (API layer)
+2. **Handler** → [src/service/](mdc:src/service) (Business logic)
+3. **Service** → [src/repository/](mdc:src/repository) (Data access)
+4. **Repository** → Database (PostgreSQL via GORM)
+5. **Database Schema**: Managed through [migrations/](mdc:migrations) with versioned SQL files
+
+## Dependency Management
+- **Go Modules**: [go.mod](mdc:go.mod) defines dependencies including Gin (HTTP framework), GORM (ORM), WebAuthn, and Zerolog
+- **Key Dependencies**:
+  - `github.com/gin-gonic/gin` - HTTP web framework
+  - `gorm.io/gorm` + `gorm.io/driver/postgres` - ORM and PostgreSQL driver
+  - `github.com/go-webauthn/webauthn` - WebAuthn/Passkey authentication
+  - `github.com/rs/zerolog` - Structured logging
+  - `github.com/joho/godotenv` - Environment configuration
+
+## Error Handling System
+Centralized error handling through domain-driven design:
+- **Error Interface**: Defined in [src/domain/error.go](mdc:src/domain/error.go) with `Error` interface and `DomainError` struct
+- **Error Codes**: Predefined error codes with HTTP status mappings (e.g., `ErrorCodeResourceNotFound`, `ErrorCodeAuthPermissionDenied`)
+- **Error Options**: Functional options pattern for error customization (`WithMsg`, `WithStatus`, `WithDetail`)
+- **HTTP Error Response**: [src/handler/response.go](mdc:src/handler/response.go) handles error parsing and JSON response formatting
+- **Error Propagation**: Errors bubble up from repository → service → handler with proper logging
+
+## Logging Architecture
+Structured logging using Zerolog:
+- **Logger Initialization**: Root logger setup in [cmd/server/main.go](mdc:cmd/server/main.go) with configurable log levels
+- **Context-Based Logging**: Logger attached to request context for tracing
+- **Log Levels**: Configurable via `LOG_LEVEL` environment variable ("error", "warn", "info", "debug", "disabled")
+- **Structured Output**: Console writer with timestamps and service identification
+- **Error Logging**: Automatic error logging in [src/handler/response.go](mdc:src/handler/response.go) with component tagging
+
+## Database Migration System
+Database schema management through SQL migrations:
+- **Migration Files**: Located in [migrations/](mdc:migrations) with numbered versioning (e.g., `000001_create_passkey_tables.up.sql`)
+- **Up/Down Migrations**: Each migration has `.up.sql` and `.down.sql` files for forward/backward compatibility
+- **Schema Structure**: 
+  - Users table with project-based isolation
+  - Credentials table for WebAuthn passkey storage
+  - Challenges table for authentication flow
+- **Migration Execution**: Managed through [Makefile](mdc:Makefile) with `make migrate` command
+- **Database Indexes**: Proper indexing on foreign keys and frequently queried columns
+
+## Configuration Management
+Environment-based configuration:
+- **Environment Variables**: Database DSN, port, log level loaded via godotenv
+- **Application Config**: Centralized in [cmd/server/main.go](mdc:cmd/server/main.go) `AppConfig` struct
+- **WebAuthn Config**: Relying party configuration for passkey authentication
+- **Development Tools**: [.air.toml](mdc:.air.toml) for hot reloading, [docker-compose.yml](mdc:docker-compose.yml) for local development
+
+## Authentication & Security
+WebAuthn/Passkey implementation:
+- **Passkey Service**: [src/service/passkey_service.go](mdc:src/service/passkey_service.go) handles WebAuthn flows
+- **Credential Management**: [src/domain/credential.go](mdc:src/domain/credential.go) and [src/domain/user.go](mdc:src/domain/user.go) define authentication entities
+- **Security Headers**: Middleware in [src/handler/middleware.go](mdc:src/handler/middleware.go) for CORS and security

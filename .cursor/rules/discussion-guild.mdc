@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Discussion Guild
+
+This rule guides discussions about project architecture design and task planning without diving into implementation details.

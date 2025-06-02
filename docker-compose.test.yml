@@ -1,0 +1,33 @@
+services:
+    postgres_test:
+        image: postgres:16-alpine
+        container_name: samanager_test_db
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: samanager_test
+        ports:
+            - '5433:5432' # Different port to avoid conflicts with dev DB
+        tmpfs:
+            - /var/lib/postgresql/data # In-memory for faster tests
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U postgres']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off # Faster for tests
+
+    # Optional: Redis for testing if needed
+    redis_test:
+        image: redis:7-alpine
+        container_name: samanager_test_redis
+        command: redis-server --requirepass redis123
+        ports:
+            - '6380:6379' # Different port
+        tmpfs:
+            - /data
+        healthcheck:
+            test: ['CMD', 'redis-cli', 'ping']
+            interval: 10s
+            timeout: 5s
+            retries: 5
