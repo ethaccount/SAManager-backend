@@ -17,6 +17,7 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 
 	// Test data
 	accountAddress := "0x1234567890123456789012345678901234567890"
+	chainId := int64(1) // Ethereum mainnet
 	jobID := int64(12345)
 	entryPointAddress := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 
@@ -33,7 +34,7 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	}
 
 	// Test RegisterJob
-	job, err := repo.RegisterJob(accountAddress, jobID, userOperation, entryPointAddress)
+	job, err := repo.RegisterJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
 	if err != nil {
 		t.Fatalf("RegisterJob failed: %v", err)
 	}
@@ -51,8 +52,12 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 		t.Errorf("Expected accountAddress %s, got %s", accountAddress, job.AccountAddress)
 	}
 
-	if job.JobID != jobID {
-		t.Errorf("Expected JobID %d, got %d", jobID, job.JobID)
+	if job.OnChainJobID != jobID {
+		t.Errorf("Expected OnChainJobID %d, got %d", jobID, job.OnChainJobID)
+	}
+
+	if job.ChainId != chainId {
+		t.Errorf("Expected ChainId %d, got %d", chainId, job.ChainId)
 	}
 
 	if job.EntryPointAddress != entryPointAddress {
@@ -95,8 +100,8 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 		t.Errorf("Database job accountAddress mismatch: expected %s, got %s", accountAddress, dbJob.AccountAddress)
 	}
 
-	if dbJob.JobID != jobID {
-		t.Errorf("Database job JobID mismatch: expected %d, got %d", jobID, dbJob.JobID)
+	if dbJob.OnChainJobID != jobID {
+		t.Errorf("Database job OnChainJobID mismatch: expected %d, got %d", jobID, dbJob.OnChainJobID)
 	}
 
 	// Test GetUserOperation method
@@ -117,6 +122,7 @@ func TestJobRepository_RegisterJob_DuplicateJobID(t *testing.T) {
 	repo := NewJobRepository(db)
 
 	accountAddress := "0x1234567890123456789012345678901234567890"
+	chainId := int64(1) // Ethereum mainnet
 	jobID := int64(12345)
 	entryPointAddress := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 
@@ -128,13 +134,13 @@ func TestJobRepository_RegisterJob_DuplicateJobID(t *testing.T) {
 	}
 
 	// Register first job
-	_, err := repo.RegisterJob(accountAddress, jobID, userOperation, entryPointAddress)
+	_, err := repo.RegisterJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
 	if err != nil {
 		t.Fatalf("First RegisterJob failed: %v", err)
 	}
 
 	// Try to register duplicate job (same smart_account and job_id)
-	_, err = repo.RegisterJob(accountAddress, jobID, userOperation, entryPointAddress)
+	_, err = repo.RegisterJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
 	if err == nil {
 		t.Error("Expected error when registering duplicate job, but got none")
 	}

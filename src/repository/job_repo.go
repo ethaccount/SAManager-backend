@@ -15,7 +15,7 @@ func NewJobRepository(db *gorm.DB) *JobRepository {
 	return &JobRepository{db: db}
 }
 
-func (r *JobRepository) RegisterJob(smartAccount string, jobID int64, userOperation *domain.UserOperation, entryPoint string) (*domain.Job, error) {
+func (r *JobRepository) RegisterJob(smartAccount string, chainId int64, jobID int64, userOperation *domain.UserOperation, entryPoint string) (*domain.Job, error) {
 	userOpJSON, err := json.Marshal(userOperation)
 	if err != nil {
 		return nil, err
@@ -23,7 +23,8 @@ func (r *JobRepository) RegisterJob(smartAccount string, jobID int64, userOperat
 
 	job := &domain.Job{
 		AccountAddress:    smartAccount,
-		JobID:             jobID,
+		ChainId:           chainId,
+		OnChainJobID:      jobID,
 		UserOperation:     userOpJSON,
 		EntryPointAddress: entryPoint,
 	}

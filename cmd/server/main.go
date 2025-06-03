@@ -8,7 +8,6 @@ import (
 	"github.com/ethaccount/backend/src/handler"
 	"github.com/ethaccount/backend/src/service"
 	"github.com/gin-gonic/gin"
-	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/rs/zerolog"
 
 	"github.com/joho/godotenv"
@@ -20,17 +19,7 @@ const (
 	AppBuild   = "dev"
 )
 
-type AppConfig struct {
-	LogLevel *string
-
-	// Database configuration
-	DSN *string
-
-	// HTTP configuration
-	Port *string
-}
-
-func initAppConfig() AppConfig {
+func initAppConfig() service.AppConfig {
 
 	err := godotenv.Load()
 	if err != nil {
@@ -53,10 +42,46 @@ func initAppConfig() AppConfig {
 		logLevel = "debug"
 	}
 
-	return AppConfig{
-		LogLevel: &logLevel,
-		DSN:      &dsn,
-		Port:     &port,
+	// RPC URLs
+	sepoliaRPCURL := os.Getenv("SEPOLIA_RPC_URL")
+	if sepoliaRPCURL == "" {
+		sepoliaRPCURL = "https://ethereum-sepolia-rpc.publicnode.com"
+	}
+
+	arbitrumSepoliaRPCURL := os.Getenv("ARBITRUM_SEPOLIA_RPC_URL")
+	if arbitrumSepoliaRPCURL == "" {
+		arbitrumSepoliaRPCURL = "https://arbitrum-sepolia-rpc.publicnode.com"
+	}
+
+	baseSepoliaRPCURL := os.Getenv("BASE_SEPOLIA_RPC_URL")
+	if baseSepoliaRPCURL == "" {
+		baseSepoliaRPCURL = "https://base-sepolia-rpc.publicnode.com"
+	}
+
+	optimismSepoliaRPCURL := os.Getenv("OPTIMISM_SEPOLIA_RPC_URL")
+	if optimismSepoliaRPCURL == "" {
+		optimismSepoliaRPCURL = "https://optimism-sepolia-rpc.publicnode.com"
+	}
+
+	polygonAmoyRPCURL := os.Getenv("POLYGON_AMOY_RPC_URL")
+	if polygonAmoyRPCURL == "" {
+		polygonAmoyRPCURL = "https://polygon-amoy-rpc.publicnode.com"
+	}
+
+	// check if all RPC URLs are set
+	if sepoliaRPCURL == "" || arbitrumSepoliaRPCURL == "" || baseSepoliaRPCURL == "" || optimismSepoliaRPCURL == "" || polygonAmoyRPCURL == "" {
+		log.Fatalf("One or more RPC URLs are not set in .env file")
+	}
+
+	return service.AppConfig{
+		LogLevel:              &logLevel,
+		DSN:                   &dsn,
+		Port:                  &port,
+		SepoliaRPCURL:         &sepoliaRPCURL,
+		ArbitrumSepoliaRPCURL: &arbitrumSepoliaRPCURL,
+		BaseSepoliaRPCURL:     &baseSepoliaRPCURL,
+		OptimismSepoliaRPCURL: &optimismSepoliaRPCURL,
+		PolygonAmoyRPCURL:     &polygonAmoyRPCURL,
 	}
 }
 
@@ -100,14 +125,7 @@ func main() {
 		Msgf("Launching %s", AppName)
 
 	// Create application
-	app := service.NewApplication(rootCtx, service.ApplicationConfig{
-		DatabaseDSN: *cfg.DSN,
-		WebAuthnConfig: &webauthn.Config{
-			RPDisplayName: "Passkey Demo",
-			RPID:          "localhost",
-			RPOrigins:     []string{"http://localhost:" + *cfg.Port},
-		},
-	})
+	app := service.NewApplication(rootCtx, cfg)
 
 	ginRouter := gin.Default()
 	handler.RegisterRoutes(rootCtx, ginRouter, app)

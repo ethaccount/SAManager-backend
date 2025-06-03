@@ -18,13 +18,25 @@ type Application struct {
 	PasskeyService *PasskeyService
 }
 
-type ApplicationConfig struct {
-	DatabaseDSN    string
-	WebAuthnConfig *webauthn.Config
+type AppConfig struct {
+	LogLevel *string
+
+	// Database configuration
+	DSN *string
+
+	// HTTP configuration
+	Port *string
+
+	// RPC URLs
+	SepoliaRPCURL         *string
+	ArbitrumSepoliaRPCURL *string
+	BaseSepoliaRPCURL     *string
+	OptimismSepoliaRPCURL *string
+	PolygonAmoyRPCURL     *string
 }
 
-func NewApplication(ctx context.Context, config ApplicationConfig) *Application {
-	database, err := gorm.Open(postgresDriver.Open(config.DatabaseDSN), &gorm.Config{})
+func NewApplication(ctx context.Context, config AppConfig) *Application {
+	database, err := gorm.Open(postgresDriver.Open(*config.DSN), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
@@ -32,13 +44,22 @@ func NewApplication(ctx context.Context, config ApplicationConfig) *Application 
 	// run migration files
 	migrationPath := "file://migrations"
 
-	MigrationUp(config.DatabaseDSN, migrationPath)
+	MigrationUp(*config.DSN, migrationPath)
 
 	passkeyRepo := repository.NewPasskeyRepository(database)
-	passkeyService, err := NewPasskeyService(ctx, passkeyRepo, config.WebAuthnConfig, 5*time.Minute)
+
+	webAuthnConfig := &webauthn.Config{
+		RPDisplayName: "Passkey Demo",
+		RPID:          "localhost",
+		RPOrigins:     []string{"http://localhost:" + *config.Port},
+	}
+
+	passkeyService, err := NewPasskeyService(ctx, passkeyRepo, webAuthnConfig, 5*time.Minute)
 	if err != nil {
 		log.Fatalf("failed to create passkey service: %v", err)
 	}
+
+	// blockchainService := blockchain.NewBlockchainService(config)
 
 	// pollingService.start()+0
 
