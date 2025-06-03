@@ -1,11 +1,11 @@
 services:
     postgres:
         image: postgres:16-alpine
-        container_name: postgres_db
+        container_name: samanager_db
         environment:
             POSTGRES_USER: postgres
             POSTGRES_PASSWORD: postgres
-            POSTGRES_DB: myapp_db
+            POSTGRES_DB: samanager
         volumes:
             - postgres_data:/var/lib/postgresql/data
         ports:
@@ -19,7 +19,7 @@ services:
 
     redis:
         image: redis:7-alpine
-        container_name: redis_cache
+        container_name: samanager_redis
         command: redis-server --requirepass redis123
         volumes:
             - redis_data:/data

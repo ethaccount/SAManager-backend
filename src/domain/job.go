@@ -10,13 +10,13 @@ import (
 
 // Job represents a job mapping in the scheduling system
 type Job struct {
-	ID            uuid.UUID       `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	SmartAccount  string          `gorm:"type:varchar(42);not null"`
-	JobID         int64           `gorm:"not null"`
-	UserOperation json.RawMessage `gorm:"type:jsonb;not null"`
-	EntryPoint    string          `gorm:"type:varchar(42);not null"`
-	CreatedAt     time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP"`
-	UpdatedAt     time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP"`
+	ID                uuid.UUID       `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	AccountAddress    string          `gorm:"type:varchar(42);not null"`
+	JobID             int64           `gorm:"not null"`
+	UserOperation     json.RawMessage `gorm:"type:jsonb;not null"`
+	EntryPointAddress string          `gorm:"type:varchar(42);not null"`
+	CreatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP"`
+	UpdatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP"`
 }
 
 // GetUserOperation returns the user operation as a typed struct

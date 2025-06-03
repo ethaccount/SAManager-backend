@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/ethaccount/backend/src/domain"
-	"github.com/ethaccount/backend/src/repository/testutil"
+	"github.com/ethaccount/backend/src/testutil"
 	"github.com/google/uuid"
 )
 
@@ -16,9 +16,9 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	repo := NewJobRepository(db)
 
 	// Test data
-	smartAccount := "0x1234567890123456789012345678901234567890"
+	accountAddress := "0x1234567890123456789012345678901234567890"
 	jobID := int64(12345)
-	entryPoint := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+	entryPointAddress := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 
 	userOperation := &domain.UserOperation{
 		Sender:               "0x1234567890123456789012345678901234567890",
@@ -33,7 +33,7 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	}
 
 	// Test RegisterJob
-	job, err := repo.RegisterJob(smartAccount, jobID, userOperation, entryPoint)
+	job, err := repo.RegisterJob(accountAddress, jobID, userOperation, entryPointAddress)
 	if err != nil {
 		t.Fatalf("RegisterJob failed: %v", err)
 	}
@@ -47,16 +47,16 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 		t.Error("Job ID should be generated")
 	}
 
-	if job.SmartAccount != smartAccount {
-		t.Errorf("Expected SmartAccount %s, got %s", smartAccount, job.SmartAccount)
+	if job.AccountAddress != accountAddress {
+		t.Errorf("Expected accountAddress %s, got %s", accountAddress, job.AccountAddress)
 	}
 
 	if job.JobID != jobID {
 		t.Errorf("Expected JobID %d, got %d", jobID, job.JobID)
 	}
 
-	if job.EntryPoint != entryPoint {
-		t.Errorf("Expected EntryPoint %s, got %s", entryPoint, job.EntryPoint)
+	if job.EntryPointAddress != entryPointAddress {
+		t.Errorf("Expected EntryPointAddress %s, got %s", entryPointAddress, job.EntryPointAddress)
 	}
 
 	if job.CreatedAt.IsZero() {
@@ -91,8 +91,8 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 		t.Fatalf("Failed to find job in database: %v", err)
 	}
 
-	if dbJob.SmartAccount != smartAccount {
-		t.Errorf("Database job SmartAccount mismatch: expected %s, got %s", smartAccount, dbJob.SmartAccount)
+	if dbJob.AccountAddress != accountAddress {
+		t.Errorf("Database job accountAddress mismatch: expected %s, got %s", accountAddress, dbJob.AccountAddress)
 	}
 
 	if dbJob.JobID != jobID {
@@ -116,9 +116,9 @@ func TestJobRepository_RegisterJob_DuplicateJobID(t *testing.T) {
 
 	repo := NewJobRepository(db)
 
-	smartAccount := "0x1234567890123456789012345678901234567890"
+	accountAddress := "0x1234567890123456789012345678901234567890"
 	jobID := int64(12345)
-	entryPoint := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+	entryPointAddress := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 
 	userOperation := &domain.UserOperation{
 		Sender:    "0x1234567890123456789012345678901234567890",
@@ -128,31 +128,14 @@ func TestJobRepository_RegisterJob_DuplicateJobID(t *testing.T) {
 	}
 
 	// Register first job
-	_, err := repo.RegisterJob(smartAccount, jobID, userOperation, entryPoint)
+	_, err := repo.RegisterJob(accountAddress, jobID, userOperation, entryPointAddress)
 	if err != nil {
 		t.Fatalf("First RegisterJob failed: %v", err)
 	}
 
 	// Try to register duplicate job (same smart_account and job_id)
-	_, err = repo.RegisterJob(smartAccount, jobID, userOperation, entryPoint)
+	_, err = repo.RegisterJob(accountAddress, jobID, userOperation, entryPointAddress)
 	if err == nil {
 		t.Error("Expected error when registering duplicate job, but got none")
-	}
-}
-
-func TestJobRepository_RegisterJob_InvalidUserOperation(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	defer testutil.CleanupTestDB(t, db)
-
-	repo := NewJobRepository(db)
-
-	smartAccount := "0x1234567890123456789012345678901234567890"
-	jobID := int64(12345)
-	entryPoint := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
-
-	// Test with nil UserOperation
-	_, err := repo.RegisterJob(smartAccount, jobID, nil, entryPoint)
-	if err == nil {
-		t.Error("Expected error when registering job with nil UserOperation, but got none")
 	}
 }

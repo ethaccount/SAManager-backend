@@ -1,16 +1,19 @@
-.PHONY: migrate
-migrate:
-	go run cmd/migrate/main.go
-
-.PHONY: run
+.PHONY: run # .PHONY is to make always executes the commands regardless of whether a file named "run" exists.
 run:
 	go run cmd/server/main.go
 
+.PHONY: migrate
+migrate:
+	migrate -database $DB_URL -path migrations up
 
-# Start test database
+db-up:
+	docker compose up -d
+
+db-down:
+	docker compose down
+
 test-db-up:
-	docker compose -f docker-compose.test.yml up -d postgres_test
+	docker compose -f docker-compose.test.yml up -d
 
-# Stop test database
 test-db-down:
 	docker compose -f docker-compose.test.yml down

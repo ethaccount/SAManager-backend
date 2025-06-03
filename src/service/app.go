@@ -5,9 +5,11 @@ import (
 	"log"
 	"time"
 
-	"github.com/ethaccount/backend/src/domain"
 	"github.com/ethaccount/backend/src/repository"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	postgresDriver "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -27,7 +29,10 @@ func NewApplication(ctx context.Context, config ApplicationConfig) *Application 
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 
-	database.AutoMigrate(&domain.User{}, &domain.Credential{}, &domain.Challenge{})
+	// run migration files
+	migrationPath := "file://migrations"
+
+	MigrationUp(config.DatabaseDSN, migrationPath)
 
 	passkeyRepo := repository.NewPasskeyRepository(database)
 	passkeyService, err := NewPasskeyService(ctx, passkeyRepo, config.WebAuthnConfig, 5*time.Minute)
@@ -35,10 +40,36 @@ func NewApplication(ctx context.Context, config ApplicationConfig) *Application 
 		log.Fatalf("failed to create passkey service: %v", err)
 	}
 
-	// pollingService.start()
+	// pollingService.start()+0
 
 	return &Application{
 		PasskeyService: passkeyService,
 		// ExecutionService: executionService,
+	}
+}
+
+func MigrationUp(databaseDSN string, migrationPath string) {
+	migration, err := migrate.New(
+		migrationPath,
+		databaseDSN)
+	if err != nil {
+		log.Fatalf("failed to create migrate: %v", err)
+	}
+
+	if err := migration.Up(); err != nil {
+		log.Fatalf("failed to run migration up: %v", err)
+	}
+}
+
+func MigrationDown(databaseDSN string, migrationPath string) {
+	migration, err := migrate.New(
+		migrationPath,
+		databaseDSN)
+	if err != nil {
+		log.Fatalf("failed to create migrate: %v", err)
+	}
+
+	if err := migration.Down(); err != nil {
+		log.Fatalf("failed to run migration down: %v", err)
 	}
 }

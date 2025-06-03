@@ -22,10 +22,10 @@ func (r *JobRepository) RegisterJob(smartAccount string, jobID int64, userOperat
 	}
 
 	job := &domain.Job{
-		SmartAccount:  smartAccount,
-		JobID:         jobID,
-		UserOperation: userOpJSON,
-		EntryPoint:    entryPoint,
+		AccountAddress:    smartAccount,
+		JobID:             jobID,
+		UserOperation:     userOpJSON,
+		EntryPointAddress: entryPoint,
 	}
 
 	if err := r.db.Create(job).Error; err != nil {
