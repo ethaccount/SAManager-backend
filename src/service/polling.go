@@ -18,7 +18,6 @@ type PollingConfig struct {
 }
 
 func NewPollingService(
-	_ context.Context,
 	jobService *JobService,
 	blockchainService *BlockchainService,
 	config PollingConfig,
@@ -32,7 +31,7 @@ func NewPollingService(
 
 // logger wraps the execution context with component info
 func (s *PollingService) logger(ctx context.Context) *zerolog.Logger {
-	l := zerolog.Ctx(ctx).With().Str("component", "polling-service").Logger()
+	l := zerolog.Ctx(ctx).With().Str("service", "polling").Logger()
 	return &l
 }
 
@@ -76,7 +75,7 @@ func (s *PollingService) poll(ctx context.Context) error {
 	s.logger(ctx).Debug().Int("job_count", len(jobs)).Msg("retrieved jobs")
 
 	// Get execution configs from service in batch
-	executionConfigs, err := s.blockchainService.GetExecutionConfigsBatch(jobs)
+	executionConfigs, err := s.blockchainService.GetExecutionConfigsBatch(ctx, jobs)
 	if err != nil {
 		return err
 	}
@@ -99,7 +98,7 @@ func (s *PollingService) poll(ctx context.Context) error {
 				Str("job_id", job.ID.String()).
 				Str("account_address", job.AccountAddress).
 				Int64("on_chain_job_id", job.OnChainJobID).
-				Int64("chain_id", job.ChainId).
+				Int64("chain_id", job.ChainID).
 				Msg("job is overdue for execution")
 
 			// TODO: Trigger execution service here

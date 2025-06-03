@@ -20,8 +20,34 @@ func NewJobService(jobRepo *repository.JobRepository) *JobService {
 
 // logger wraps the execution context with component info
 func (s *JobService) logger(ctx context.Context) *zerolog.Logger {
-	l := zerolog.Ctx(ctx).With().Str("component", "job-service").Logger()
+	l := zerolog.Ctx(ctx).With().Str("service", "job").Logger()
 	return &l
+}
+
+// RegisterJob creates a new job registration
+func (s *JobService) RegisterJob(ctx context.Context, accountAddress string, chainId int64, jobID int64, userOperation *domain.UserOperation, entryPoint string) (*domain.Job, error) {
+	s.logger(ctx).Debug().
+		Str("func", "RegisterJob").
+		Str("account_address", accountAddress).
+		Int64("chain_id", chainId).
+		Int64("job_id", jobID).
+		Str("entry_point", entryPoint).
+		Msg("registering new job")
+
+	job, err := s.jobRepo.RegisterJob(accountAddress, chainId, jobID, userOperation, entryPoint)
+	if err != nil {
+		s.logger(ctx).Error().Err(err).Msg("failed to register job in repository")
+		return nil, err
+	}
+
+	s.logger(ctx).Info().
+		Str("job_uuid", job.ID.String()).
+		Str("account_address", accountAddress).
+		Int64("chain_id", chainId).
+		Int64("job_id", jobID).
+		Msg("successfully registered job")
+
+	return job, nil
 }
 
 // GetAllActiveJobs retrieves all jobs that are available for polling

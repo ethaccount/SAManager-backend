@@ -56,8 +56,8 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 		t.Errorf("Expected OnChainJobID %d, got %d", jobID, job.OnChainJobID)
 	}
 
-	if job.ChainId != chainId {
-		t.Errorf("Expected ChainId %d, got %d", chainId, job.ChainId)
+	if job.ChainID != chainId {
+		t.Errorf("Expected ChainID %d, got %d", chainId, job.ChainID)
 	}
 
 	if job.EntryPointAddress != entryPointAddress {
@@ -139,7 +139,7 @@ func TestJobRepository_RegisterJob_DuplicateJobID(t *testing.T) {
 		t.Fatalf("First RegisterJob failed: %v", err)
 	}
 
-	// Try to register duplicate job (same smart_account and job_id)
+	// Try to register duplicate job (same account_address and job_id)
 	_, err = repo.RegisterJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
 	if err == nil {
 		t.Error("Expected error when registering duplicate job, but got none")

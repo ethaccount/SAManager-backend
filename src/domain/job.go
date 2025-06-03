@@ -13,7 +13,7 @@ import (
 type Job struct {
 	ID                uuid.UUID       `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
 	AccountAddress    string          `gorm:"type:varchar(42);not null"`
-	ChainId           int64           `gorm:"not null"`
+	ChainID           int64           `gorm:"not null"`
 	OnChainJobID      int64           `gorm:"not null"`
 	UserOperation     json.RawMessage `gorm:"type:jsonb;not null"`
 	EntryPointAddress string          `gorm:"type:varchar(42);not null"`

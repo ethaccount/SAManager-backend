@@ -44,7 +44,7 @@ This scheduling service is one part of the larger SAManager-backend system, whic
 #### API Service
 - **Purpose**: Job registration and management interface
 - **Functions**:
-  - Register job mappings (smart_account, job_id, user_operation)
+  - Register job mappings (account_address, job_id, user_operation)
   - Store single private key in encrypted keystore
   - Provide job status queries
   - Handle authentication
@@ -71,7 +71,7 @@ This scheduling service is one part of the larger SAManager-backend system, whic
 
 ```solidity
 // On-chain execution configuration storage
-mapping(address smartAccount => mapping(uint256 jobId => ExecutionConfig)) public executionLog;
+mapping(address accountAddress => mapping(uint256 jobId => ExecutionConfig)) public executionLog;
 
 struct ExecutionConfig {
     uint48 executeInterval;                 // Seconds between executions
@@ -90,14 +90,14 @@ struct ExecutionConfig {
 ```sql
 CREATE TABLE registered_jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    smart_account VARCHAR(42) NOT NULL,
+    account_address VARCHAR(42) NOT NULL,
     job_id BIGINT NOT NULL,
     user_operation JSONB NOT NULL,
     created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(smart_account, job_id)
+    UNIQUE(account_address, job_id)
 );
 
-CREATE INDEX idx_smart_account_job ON registered_jobs(smart_account, job_id);
+CREATE INDEX idx_smart_account_job ON registered_jobs(account_address, job_id);
 ```
 
 #### Single Private Key Storage
@@ -145,7 +145,7 @@ CREATE TABLE keystore (
 ### 1. Job Registration
 ```
 SAManager Dapp → API Service: POST /jobs/register
-├── Parameters: smart_account, job_id, user_operation
+├── Parameters: account_address, job_id, user_operation
 ├── API Service → Database: Store job mapping
 └── Response: success/failure
 
@@ -155,7 +155,7 @@ Note: Execution config is stored on blockchain by the dapp
 ### 2. Execution Detection & Triggering
 ```
 Polling Service (continuous loop):
-├── Read executionLog[smart_account][job_id] from blockchain
+├── Read executionLog[account_address][job_id] from blockchain
 ├── For each registered job:
 │   ├── Check: isEnabled && (lastExecutionTime + executeInterval < now)
 │   └── If overdue → Trigger Execution Service
@@ -236,8 +236,8 @@ type RetryConfig struct {
 {
     "timestamp": "2024-01-15T10:30:00Z",
     "level": "info",
-    "service": "execution-service",
-    "smart_account": "0x...",
+    "service": "execution",
+    "account_address": "0x...",
     "job_id": 42,
     "action": "userop_submitted",
     "user_op_hash": "0x..."

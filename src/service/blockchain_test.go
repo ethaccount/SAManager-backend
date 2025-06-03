@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -36,14 +37,16 @@ func TestGetExecutionConfig(t *testing.T) {
 	job := &domain.Job{
 		ID:                uuid.New(),
 		AccountAddress:    "0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1",
-		ChainId:           11155111, // Sepolia testnet
+		ChainID:           11155111, // Sepolia testnet
 		OnChainJobID:      1,
 		UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 		EntryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
 	}
 
+	ctx := context.Background()
+
 	// Call GetExecutionConfig
-	config, err := blockchainService.GetExecutionConfig(job)
+	config, err := blockchainService.GetExecutionConfig(ctx, job)
 
 	// Verify the call succeeds
 	if err != nil {
@@ -95,19 +98,21 @@ func TestGetExecutionConfig(t *testing.T) {
 }
 
 func TestGetExecutionConfig_UnsupportedChain(t *testing.T) {
+	ctx := context.Background()
+
 	blockchainService := getBlockchainService()
 	// Test with unsupported chain ID
 	job := &domain.Job{
 		ID:                uuid.New(),
 		AccountAddress:    "0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1",
-		ChainId:           1, // Mainnet - not supported in the function
+		ChainID:           1, // Mainnet - not supported in the function
 		OnChainJobID:      2,
 		UserOperation:     json.RawMessage(`{}`),
 		EntryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
 	}
 
 	// Call GetExecutionConfig - should fail
-	config, err := blockchainService.GetExecutionConfig(job)
+	config, err := blockchainService.GetExecutionConfig(ctx, job)
 
 	// Verify it returns an error
 	if err == nil {
@@ -126,10 +131,11 @@ func TestGetExecutionConfig_UnsupportedChain(t *testing.T) {
 }
 
 func TestGetExecutionConfigsBatch_EmptyInput(t *testing.T) {
+	ctx := context.Background()
 	blockchainService := getBlockchainService()
 
 	// Test with empty job slice
-	configs, err := blockchainService.GetExecutionConfigsBatch([]*domain.Job{})
+	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, []*domain.Job{})
 
 	// Should succeed with empty result
 	if err != nil {
@@ -146,20 +152,21 @@ func TestGetExecutionConfigsBatch_EmptyInput(t *testing.T) {
 }
 
 func TestGetExecutionConfigsBatch_SingleJob(t *testing.T) {
+	ctx := context.Background()
 	blockchainService := getBlockchainService()
 
 	// Create single test job
 	job := &domain.Job{
 		ID:                uuid.New(),
 		AccountAddress:    "0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1",
-		ChainId:           11155111, // Sepolia testnet
+		ChainID:           11155111, // Sepolia testnet
 		OnChainJobID:      1,
 		UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 		EntryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
 	}
 
 	// Call GetExecutionConfigsBatch
-	configs, err := blockchainService.GetExecutionConfigsBatch([]*domain.Job{job})
+	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, []*domain.Job{job})
 
 	// Verify the call succeeds
 	if err != nil {
@@ -205,6 +212,7 @@ func TestGetExecutionConfigsBatch_SingleJob(t *testing.T) {
 }
 
 func TestGetExecutionConfigsBatch_MultipleJobsSameChain(t *testing.T) {
+	ctx := context.Background()
 	blockchainService := getBlockchainService()
 
 	// Create multiple test jobs on the same chain
@@ -212,7 +220,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsSameChain(t *testing.T) {
 		{
 			ID:                uuid.New(),
 			AccountAddress:    "0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1",
-			ChainId:           11155111, // Sepolia testnet
+			ChainID:           11155111, // Sepolia testnet
 			OnChainJobID:      1,
 			UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 			EntryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
@@ -220,7 +228,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsSameChain(t *testing.T) {
 		{
 			ID:                uuid.New(),
 			AccountAddress:    "0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1",
-			ChainId:           11155111, // Sepolia testnet
+			ChainID:           11155111, // Sepolia testnet
 			OnChainJobID:      2,
 			UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x2","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 			EntryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
@@ -228,7 +236,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsSameChain(t *testing.T) {
 	}
 
 	// Call GetExecutionConfigsBatch
-	configs, err := blockchainService.GetExecutionConfigsBatch(jobs)
+	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, jobs)
 
 	// Verify the call succeeds
 	if err != nil {
@@ -259,6 +267,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsSameChain(t *testing.T) {
 }
 
 func TestGetExecutionConfigsBatch_MultipleJobsDifferentChains(t *testing.T) {
+	ctx := context.Background()
 	blockchainService := getBlockchainService()
 
 	// Create test jobs on different chains
@@ -266,7 +275,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsDifferentChains(t *testing.T) {
 		{
 			ID:                uuid.New(),
 			AccountAddress:    "0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1",
-			ChainId:           11155111, // Sepolia testnet
+			ChainID:           11155111, // Sepolia testnet
 			OnChainJobID:      1,
 			UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 			EntryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
@@ -274,7 +283,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsDifferentChains(t *testing.T) {
 		{
 			ID:                uuid.New(),
 			AccountAddress:    "0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1",
-			ChainId:           84532, // Base Sepolia
+			ChainID:           84532, // Base Sepolia
 			OnChainJobID:      1,
 			UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 			EntryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
@@ -282,7 +291,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsDifferentChains(t *testing.T) {
 	}
 
 	// Call GetExecutionConfigsBatch
-	configs, err := blockchainService.GetExecutionConfigsBatch(jobs)
+	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, jobs)
 
 	// Verify the call succeeds
 	if err != nil {
@@ -298,7 +307,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsDifferentChains(t *testing.T) {
 	for _, job := range jobs {
 		config, exists := configs[job.ID.String()]
 		if !exists {
-			t.Errorf("Config not found for job ID %s on chain %d", job.ID.String(), job.ChainId)
+			t.Errorf("Config not found for job ID %s on chain %d", job.ID.String(), job.ChainID)
 			continue
 		}
 
@@ -308,25 +317,26 @@ func TestGetExecutionConfigsBatch_MultipleJobsDifferentChains(t *testing.T) {
 		}
 
 		t.Logf("Job %s (Chain %d) - ExecuteInterval: %s, NumberOfExecutions: %d",
-			job.ID.String(), job.ChainId, config.ExecuteInterval.String(), config.NumberOfExecutions)
+			job.ID.String(), job.ChainID, config.ExecuteInterval.String(), config.NumberOfExecutions)
 	}
 }
 
 func TestGetExecutionConfigsBatch_UnsupportedChain(t *testing.T) {
+	ctx := context.Background()
 	blockchainService := getBlockchainService()
 
 	// Create test job with unsupported chain
 	job := &domain.Job{
 		ID:                uuid.New(),
 		AccountAddress:    "0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1",
-		ChainId:           1, // Mainnet - not supported
+		ChainID:           1, // Mainnet - not supported
 		OnChainJobID:      1,
 		UserOperation:     json.RawMessage(`{}`),
 		EntryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
 	}
 
 	// Call GetExecutionConfigsBatch - should fail
-	configs, err := blockchainService.GetExecutionConfigsBatch([]*domain.Job{job})
+	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, []*domain.Job{job})
 
 	// Verify it returns an error
 	if err == nil {
@@ -344,6 +354,7 @@ func TestGetExecutionConfigsBatch_UnsupportedChain(t *testing.T) {
 }
 
 func TestGetExecutionConfigsBatch_MixedValidInvalidChains(t *testing.T) {
+	ctx := context.Background()
 	blockchainService := getBlockchainService()
 
 	// Create jobs with mixed valid and invalid chains
@@ -351,7 +362,7 @@ func TestGetExecutionConfigsBatch_MixedValidInvalidChains(t *testing.T) {
 		{
 			ID:                uuid.New(),
 			AccountAddress:    "0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1",
-			ChainId:           11155111, // Sepolia testnet - valid
+			ChainID:           11155111, // Sepolia testnet - valid
 			OnChainJobID:      1,
 			UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 			EntryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
@@ -359,7 +370,7 @@ func TestGetExecutionConfigsBatch_MixedValidInvalidChains(t *testing.T) {
 		{
 			ID:                uuid.New(),
 			AccountAddress:    "0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1",
-			ChainId:           1, // Mainnet - invalid
+			ChainID:           1, // Mainnet - invalid
 			OnChainJobID:      1,
 			UserOperation:     json.RawMessage(`{}`),
 			EntryPointAddress: "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
@@ -367,7 +378,7 @@ func TestGetExecutionConfigsBatch_MixedValidInvalidChains(t *testing.T) {
 	}
 
 	// Call GetExecutionConfigsBatch - should fail due to invalid chain
-	configs, err := blockchainService.GetExecutionConfigsBatch(jobs)
+	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, jobs)
 
 	// Verify it returns an error
 	if err == nil {

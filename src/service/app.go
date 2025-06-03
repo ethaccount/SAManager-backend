@@ -16,6 +16,7 @@ import (
 
 type Application struct {
 	PasskeyService *PasskeyService
+	JobService     *JobService
 }
 
 type AppConfig struct {
@@ -68,7 +69,7 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 	blockchainService := NewBlockchainService(config)
 
 	// Polling Service
-	pollingService := NewPollingService(ctx, jobService, blockchainService, PollingConfig{
+	pollingService := NewPollingService(jobService, blockchainService, PollingConfig{
 		PollingInterval: 10 * time.Second,
 	})
 
@@ -76,6 +77,7 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 
 	return &Application{
 		PasskeyService: passkeyService,
+		JobService:     jobService,
 	}
 }
 

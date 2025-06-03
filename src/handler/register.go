@@ -28,6 +28,7 @@ func RegisterRoutes(ctx context.Context, router *gin.Engine, app *service.Applic
 	router.GET("/health", handleHealthCheck)
 
 	passkeyHandler := NewPasskeyHandler(app.PasskeyService)
+	jobHandler := NewJobHandler(app.JobService)
 
 	v1 := router.Group("/api/v1")
 	{
@@ -35,6 +36,9 @@ func RegisterRoutes(ctx context.Context, router *gin.Engine, app *service.Applic
 		// v1.POST("/register/verify", passkeyHandler.RegisterVerify)
 		// v1.POST("/login/options", passkeyHandler.LoginOptions)
 		// v1.POST("/login/verify", passkeyHandler.LoginVerify)
+
+		// Job management endpoints
+		v1.POST("/jobs", jobHandler.RegisterJob)
 	}
 
 }

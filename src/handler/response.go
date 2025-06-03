@@ -18,9 +18,8 @@ type ErrorMessage struct {
 
 func respondWithError(c *gin.Context, err error) {
 	errMessage := parseError(err)
-
 	ctx := c.Request.Context()
-	zerolog.Ctx(ctx).Error().Str("component", "handler").Msg(errMessage.Message)
+	zerolog.Ctx(ctx).Error().Str("func", "respondWithError").Msg(errMessage.Message)
 	_ = c.Error(err)
 	c.AbortWithStatusJSON(errMessage.Code, errMessage)
 }

@@ -31,7 +31,7 @@ func NewPasskeyService(_ context.Context, repo *repository.PasskeyRepository, co
 
 // logger wrap the execution context with component info
 func (s *PasskeyService) logger(ctx context.Context) *zerolog.Logger {
-	l := zerolog.Ctx(ctx).With().Str("component", "passkey-service").Logger()
+	l := zerolog.Ctx(ctx).With().Str("service", "passkey").Logger()
 	return &l
 }
 
