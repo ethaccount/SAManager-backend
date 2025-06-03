@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/ethaccount/backend/src/domain"
-
 	"github.com/rs/zerolog"
 )
 
@@ -83,7 +81,6 @@ func (s *PollingService) poll(ctx context.Context) error {
 		return err
 	}
 
-	now := time.Now().Unix()
 	overdueJobs := 0
 
 	// Check each job for overdue executions
@@ -96,7 +93,7 @@ func (s *PollingService) poll(ctx context.Context) error {
 			continue
 		}
 
-		if s.isJobOverdue(config, now) {
+		if config.IsTimeToExecute() {
 			overdueJobs++
 			s.logger(ctx).Info().
 				Str("job_id", job.ID.String()).
@@ -116,25 +113,4 @@ func (s *PollingService) poll(ctx context.Context) error {
 		Msg("polling cycle completed")
 
 	return nil
-}
-
-// isJobOverdue checks if a job is overdue for execution
-func (s *PollingService) isJobOverdue(config *domain.ExecutionConfig, currentTime int64) bool {
-	if !config.IsEnabled {
-		return false
-	}
-
-	// Check if all executions are completed
-	if config.NumberOfExecutionsCompleted >= config.NumberOfExecutions {
-		return false
-	}
-
-	// Check if job has started
-	if currentTime < config.StartDate.Int64() {
-		return false
-	}
-
-	// Check if enough time has passed since last execution
-	nextExecutionTime := config.LastExecutionTime.Int64() + config.ExecuteInterval.Int64()
-	return currentTime >= nextExecutionTime
 }
