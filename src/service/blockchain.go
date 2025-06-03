@@ -1,4 +1,4 @@
-package blockchain
+package service
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/ethaccount/backend/src/domain"
-	"github.com/ethaccount/backend/src/service"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -26,7 +26,7 @@ type BlockchainService struct {
 	PolygonAmoyRPCURL     *string
 }
 
-func NewBlockchainService(config service.AppConfig) *BlockchainService {
+func NewBlockchainService(config AppConfig) *BlockchainService {
 
 	return &BlockchainService{
 		SepoliaRPCURL:         config.SepoliaRPCURL,

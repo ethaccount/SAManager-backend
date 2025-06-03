@@ -35,3 +35,12 @@ func (r *JobRepository) RegisterJob(smartAccount string, chainId int64, jobID in
 
 	return job, nil
 }
+
+// GetAllJobs retrieves all registered jobs from the database
+func (r *JobRepository) GetAllJobs() ([]*domain.Job, error) {
+	var jobs []*domain.Job
+	if err := r.db.Find(&jobs).Error; err != nil {
+		return nil, err
+	}
+	return jobs, nil
+}

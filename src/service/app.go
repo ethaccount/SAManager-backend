@@ -38,7 +38,7 @@ type AppConfig struct {
 func NewApplication(ctx context.Context, config AppConfig) *Application {
 	database, err := gorm.Open(postgresDriver.Open(*config.DSN), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
 	// run migration files
@@ -46,6 +46,7 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 
 	MigrationUp(*config.DSN, migrationPath)
 
+	// Passkey Service
 	passkeyRepo := repository.NewPasskeyRepository(database)
 
 	webAuthnConfig := &webauthn.Config{
@@ -59,13 +60,22 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 		log.Fatalf("failed to create passkey service: %v", err)
 	}
 
-	// blockchainService := blockchain.NewBlockchainService(config)
+	// Job Service
+	jobRepo := repository.NewJobRepository(database)
+	jobService := NewJobService(jobRepo)
 
-	// pollingService.start()+0
+	// Blockchain Service
+	blockchainService := NewBlockchainService(config)
+
+	// Polling Service
+	pollingService := NewPollingService(ctx, jobService, blockchainService, PollingConfig{
+		PollingInterval: 10 * time.Second,
+	})
+
+	go pollingService.Start(ctx)
 
 	return &Application{
 		PasskeyService: passkeyService,
-		// ExecutionService: executionService,
 	}
 }
 
@@ -77,7 +87,7 @@ func MigrationUp(databaseDSN string, migrationPath string) {
 		log.Fatalf("failed to create migrate: %v", err)
 	}
 
-	if err := migration.Up(); err != nil {
+	if err := migration.Up(); err != nil && err != migrate.ErrNoChange {
 		log.Fatalf("failed to run migration up: %v", err)
 	}
 }
@@ -90,7 +100,7 @@ func MigrationDown(databaseDSN string, migrationPath string) {
 		log.Fatalf("failed to create migrate: %v", err)
 	}
 
-	if err := migration.Down(); err != nil {
+	if err := migration.Down(); err != nil && err != migrate.ErrNoChange {
 		log.Fatalf("failed to run migration down: %v", err)
 	}
 }

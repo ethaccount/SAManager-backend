@@ -1,4 +1,4 @@
-package blockchain
+package service
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ethaccount/backend/src/domain"
-	"github.com/ethaccount/backend/src/service"
+
 	"github.com/ethaccount/backend/src/testutil"
 	"github.com/google/uuid"
 )
@@ -18,7 +18,7 @@ func getBlockchainService() *BlockchainService {
 	optimismSepoliaRpcUrl := testutil.GetEnv("OPTIMISM_SEPOLIA_RPC_URL")
 	polygonAmoyRpcUrl := testutil.GetEnv("POLYGON_AMOY_RPC_URL")
 
-	blockchainService := NewBlockchainService(service.AppConfig{
+	blockchainService := NewBlockchainService(AppConfig{
 		SepoliaRPCURL:         &sepoliaRpcUrl,
 		ArbitrumSepoliaRPCURL: &arbitrumSepoliaRpcUrl,
 		BaseSepoliaRPCURL:     &baseSepoliaRpcUrl,
