@@ -19,6 +19,17 @@ func NewPasskeyHandler(service *service.PasskeyService) *PasskeyHandler {
 	}
 }
 
+// RegisterBegin godoc
+// @Summary Begin passkey registration
+// @Description Start the WebAuthn registration process for a new passkey
+// @Tags passkey
+// @Accept json
+// @Produce json
+// @Param request body RegisterBeginRequest true "Registration request"
+// @Success 201 {object} map[string]interface{}
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /register/begin [post]
 func (h *PasskeyHandler) RegisterBegin() gin.HandlerFunc {
 	type Body struct {
 		Username string `json:"username" binding:"required"`
@@ -51,4 +62,9 @@ func (h *PasskeyHandler) RegisterBegin() gin.HandlerFunc {
 		c.JSON(http.StatusCreated, resp)
 	}
 
+}
+
+// RegisterBeginRequest represents the request for beginning passkey registration
+type RegisterBeginRequest struct {
+	Username string `json:"username" binding:"required" example:"user@example.com"`
 }

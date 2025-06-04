@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -10,8 +11,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 
+	"github.com/ethaccount/backend/docs/swagger"
+	_ "github.com/ethaccount/backend/docs/swagger"
 	"github.com/joho/godotenv"
 )
+
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.url    http://www.swagger.io/support
+// @contact.email  support@swagger.io
+
+// @license.name  Apache 2.0
+// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host      localhost:8080
+// @BasePath  /api/v1
+
+// @securityDefinitions.basic  BasicAuth
+
+// @externalDocs.description  OpenAPI
+// @externalDocs.url          https://swagger.io/resources/open-api/
 
 const (
 	AppName    = "SAManager Backend"
@@ -110,6 +130,14 @@ func initRootLogger(levelStr string) zerolog.Logger {
 func main() {
 	// Setup app configuration
 	cfg := initAppConfig()
+
+	// Update swagger info dynamically using constants
+	swagger.SwaggerInfo.Title = AppName + " API"
+	swagger.SwaggerInfo.Version = AppVersion
+	swagger.SwaggerInfo.Description = fmt.Sprintf("%s with automation service and webauthn authentication", AppName)
+	if cfg.Port != nil {
+		swagger.SwaggerInfo.Host = fmt.Sprintf("localhost:%s", *cfg.Port)
+	}
 
 	// Create root logger
 	rootLogger := initRootLogger(*cfg.LogLevel)

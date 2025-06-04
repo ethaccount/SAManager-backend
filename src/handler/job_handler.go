@@ -28,24 +28,34 @@ func (s *JobHandler) logger(ctx context.Context) *zerolog.Logger {
 
 // RegisterJobRequest represents the request payload for job registration
 type RegisterJobRequest struct {
-	AccountAddress string                `json:"accountAddress" binding:"required"`
-	ChainID        int64                 `json:"chainId" binding:"required"`
-	JobID          int64                 `json:"jobId" binding:"required"`
+	AccountAddress string                `json:"accountAddress" binding:"required" example:"0x1234567890123456789012345678901234567890"`
+	ChainID        int64                 `json:"chainId" binding:"required" example:"11155111"`
+	JobID          int64                 `json:"jobId" binding:"required" example:"1"`
 	UserOperation  *domain.UserOperation `json:"userOperation" binding:"required"`
-	EntryPoint     string                `json:"entryPoint" binding:"required"`
+	EntryPoint     string                `json:"entryPoint" binding:"required" example:"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"`
 }
 
 // RegisterJobResponse represents the response for job registration
 type RegisterJobResponse struct {
-	JobUUID        string `json:"jobUuid"`
-	AccountAddress string `json:"accountAddress"`
-	ChainID        int64  `json:"chainId"`
-	JobID          int64  `json:"jobId"`
-	EntryPoint     string `json:"entryPoint"`
-	Message        string `json:"message"`
+	JobUUID        string `json:"jobUuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+	AccountAddress string `json:"accountAddress" example:"0x1234567890123456789012345678901234567890"`
+	ChainID        int64  `json:"chainId" example:"11155111"`
+	JobID          int64  `json:"jobId" example:"1"`
+	EntryPoint     string `json:"entryPoint" example:"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"`
+	Message        string `json:"message" example:"Job registered successfully"`
 }
 
-// RegisterJob handles POST /jobs endpoint for job registration
+// RegisterJob godoc
+// @Summary Register a new job
+// @Description Register a new job with user operation for smart account management
+// @Tags jobs
+// @Accept json
+// @Produce json
+// @Param request body RegisterJobRequest true "Job registration request"
+// @Success 201 {object} RegisterJobResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /jobs [post]
 func (h *JobHandler) RegisterJob(c *gin.Context) {
 	logger := h.logger(c.Request.Context()).With().Str("func", "RegisterJob").Logger()
 

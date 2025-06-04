@@ -27,3 +27,11 @@ psql
 \dt
 
 ```
+
+### swagger
+
+Generate swagger docs
+
+```
+swag init -g cmd/server/main.go -o docs/swagger
+```

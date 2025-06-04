@@ -1,0 +1,186 @@
+basePath: /api/v1
+definitions:
+  domain.UserOperation:
+    properties:
+      callData:
+        type: string
+      callGasLimit:
+        type: string
+      factory:
+        type: string
+      factoryData:
+        type: string
+      maxFeePerGas:
+        type: string
+      maxPriorityFeePerGas:
+        type: string
+      nonce:
+        type: string
+      paymaster:
+        type: string
+      paymasterData: {}
+      paymasterPostOpGasLimit:
+        type: string
+      paymasterVerificationGasLimit:
+        type: string
+      preVerificationGas:
+        type: string
+      sender:
+        type: string
+      signature:
+        type: string
+      verificationGasLimit:
+        type: string
+    type: object
+  handler.RegisterBeginRequest:
+    properties:
+      username:
+        example: user@example.com
+        type: string
+    required:
+    - username
+    type: object
+  handler.RegisterJobRequest:
+    properties:
+      accountAddress:
+        example: 0x1234567890123456789012345678901234567890
+        type: string
+      chainId:
+        example: 11155111
+        type: integer
+      entryPoint:
+        example: 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
+        type: string
+      jobId:
+        example: 1
+        type: integer
+      userOperation:
+        $ref: '#/definitions/domain.UserOperation'
+    required:
+    - accountAddress
+    - chainId
+    - entryPoint
+    - jobId
+    - userOperation
+    type: object
+  handler.RegisterJobResponse:
+    properties:
+      accountAddress:
+        example: 0x1234567890123456789012345678901234567890
+        type: string
+      chainId:
+        example: 11155111
+        type: integer
+      entryPoint:
+        example: 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
+        type: string
+      jobId:
+        example: 1
+        type: integer
+      jobUuid:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      message:
+        example: Job registered successfully
+        type: string
+    type: object
+externalDocs:
+  description: OpenAPI
+  url: https://swagger.io/resources/open-api/
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+paths:
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Check if the service is running
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check endpoint
+      tags:
+      - health
+  /jobs:
+    post:
+      consumes:
+      - application/json
+      description: Register a new job with user operation for smart account management
+      parameters:
+      - description: Job registration request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RegisterJobRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.RegisterJobResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Register a new job
+      tags:
+      - jobs
+  /register/begin:
+    post:
+      consumes:
+      - application/json
+      description: Start the WebAuthn registration process for a new passkey
+      parameters:
+      - description: Registration request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.RegisterBeginRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Begin passkey registration
+      tags:
+      - passkey
+securityDefinitions:
+  BasicAuth:
+    type: basic
+swagger: "2.0"

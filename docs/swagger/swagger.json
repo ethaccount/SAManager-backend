@@ -1,0 +1,273 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        }
+    },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
+    "paths": {
+        "/health": {
+            "get": {
+                "description": "Check if the service is running",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check endpoint",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/jobs": {
+            "post": {
+                "description": "Register a new job with user operation for smart account management",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "jobs"
+                ],
+                "summary": "Register a new job",
+                "parameters": [
+                    {
+                        "description": "Job registration request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.RegisterJobRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handler.RegisterJobResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/register/begin": {
+            "post": {
+                "description": "Start the WebAuthn registration process for a new passkey",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "passkey"
+                ],
+                "summary": "Begin passkey registration",
+                "parameters": [
+                    {
+                        "description": "Registration request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.RegisterBeginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "domain.UserOperation": {
+            "type": "object",
+            "properties": {
+                "callData": {
+                    "type": "string"
+                },
+                "callGasLimit": {
+                    "type": "string"
+                },
+                "factory": {
+                    "type": "string"
+                },
+                "factoryData": {
+                    "type": "string"
+                },
+                "maxFeePerGas": {
+                    "type": "string"
+                },
+                "maxPriorityFeePerGas": {
+                    "type": "string"
+                },
+                "nonce": {
+                    "type": "string"
+                },
+                "paymaster": {
+                    "type": "string"
+                },
+                "paymasterData": {},
+                "paymasterPostOpGasLimit": {
+                    "type": "string"
+                },
+                "paymasterVerificationGasLimit": {
+                    "type": "string"
+                },
+                "preVerificationGas": {
+                    "type": "string"
+                },
+                "sender": {
+                    "type": "string"
+                },
+                "signature": {
+                    "type": "string"
+                },
+                "verificationGasLimit": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.RegisterBeginRequest": {
+            "type": "object",
+            "required": [
+                "username"
+            ],
+            "properties": {
+                "username": {
+                    "type": "string",
+                    "example": "user@example.com"
+                }
+            }
+        },
+        "handler.RegisterJobRequest": {
+            "type": "object",
+            "required": [
+                "accountAddress",
+                "chainId",
+                "entryPoint",
+                "jobId",
+                "userOperation"
+            ],
+            "properties": {
+                "accountAddress": {
+                    "type": "string",
+                    "example": "0x1234567890123456789012345678901234567890"
+                },
+                "chainId": {
+                    "type": "integer",
+                    "example": 11155111
+                },
+                "entryPoint": {
+                    "type": "string",
+                    "example": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+                },
+                "jobId": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "userOperation": {
+                    "$ref": "#/definitions/domain.UserOperation"
+                }
+            }
+        },
+        "handler.RegisterJobResponse": {
+            "type": "object",
+            "properties": {
+                "accountAddress": {
+                    "type": "string",
+                    "example": "0x1234567890123456789012345678901234567890"
+                },
+                "chainId": {
+                    "type": "integer",
+                    "example": 11155111
+                },
+                "entryPoint": {
+                    "type": "string",
+                    "example": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+                },
+                "jobId": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "jobUuid": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Job registered successfully"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BasicAuth": {
+            "type": "basic"
+        }
+    },
+    "externalDocs": {
+        "description": "OpenAPI",
+        "url": "https://swagger.io/resources/open-api/"
+    }
+}

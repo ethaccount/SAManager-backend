@@ -2,6 +2,9 @@
 run:
 	go run cmd/server/main.go
 
+build:
+	go build -o bin/server cmd/server/main.go
+
 .PHONY: migrate
 migrate:
 	migrate -database $DB_URL -path migrations up

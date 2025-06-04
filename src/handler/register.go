@@ -8,6 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/shopspring/decimal"
 )
@@ -25,13 +27,15 @@ func RegisterRoutes(ctx context.Context, router *gin.Engine, app *service.Applic
 
 	SetMiddlewares(ctx, router)
 
-	router.GET("/health", handleHealthCheck)
+	// Swagger documentation
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	passkeyHandler := NewPasskeyHandler(app.PasskeyService)
 	jobHandler := NewJobHandler(app.JobService)
 
 	v1 := router.Group("/api/v1")
 	{
+		v1.GET("/health", handleHealthCheck)
 		v1.POST("/register/begin", passkeyHandler.RegisterBegin())
 		// v1.POST("/register/verify", passkeyHandler.RegisterVerify)
 		// v1.POST("/login/options", passkeyHandler.LoginOptions)
