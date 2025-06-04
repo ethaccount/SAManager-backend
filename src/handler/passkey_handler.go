@@ -26,9 +26,9 @@ func NewPasskeyHandler(service *service.PasskeyService) *PasskeyHandler {
 // @Accept json
 // @Produce json
 // @Param request body RegisterBeginRequest true "Registration request"
-// @Success 201 {object} map[string]interface{}
-// @Failure 400 {object} map[string]interface{}
-// @Failure 500 {object} map[string]interface{}
+// @Success 201 {object} StandardResponse
+// @Failure 400 {object} StandardResponse
+// @Failure 500 {object} StandardResponse
 // @Router /register/begin [post]
 func (h *PasskeyHandler) RegisterBegin() gin.HandlerFunc {
 	type Body struct {
@@ -59,7 +59,7 @@ func (h *PasskeyHandler) RegisterBegin() gin.HandlerFunc {
 			Options: options,
 		}
 
-		c.JSON(http.StatusCreated, resp)
+		respondWithSuccessAndStatus(c, http.StatusCreated, resp, "Registration options created successfully")
 	}
 
 }

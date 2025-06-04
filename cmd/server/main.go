@@ -151,6 +151,10 @@ func main() {
 		Str("build", AppBuild).
 		Msgf("Launching %s", AppName)
 
+	rootLogger.Info().
+		Str("swagger_link", "http://localhost:"+*cfg.Port+"/swagger/index.html").
+		Msg("Swagger link")
+
 	// Create application
 	app := service.NewApplication(rootCtx, cfg)
 

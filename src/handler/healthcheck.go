@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -12,8 +10,9 @@ import (
 // @Tags health
 // @Accept json
 // @Produce json
-// @Success 200 {object} map[string]string
+// @Success 200 {object} StandardResponse
 // @Router /health [get]
 func handleHealthCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "ok"})
+	data := map[string]string{"status": "healthy"}
+	respondWithSuccess(c, data, "OK")
 }

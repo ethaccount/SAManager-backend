@@ -52,9 +52,9 @@ type RegisterJobResponse struct {
 // @Accept json
 // @Produce json
 // @Param request body RegisterJobRequest true "Job registration request"
-// @Success 201 {object} RegisterJobResponse
-// @Failure 400 {object} map[string]interface{}
-// @Failure 500 {object} map[string]interface{}
+// @Success 201 {object} StandardResponse
+// @Failure 400 {object} StandardResponse
+// @Failure 500 {object} StandardResponse
 // @Router /jobs [post]
 func (h *JobHandler) RegisterJob(c *gin.Context) {
 	logger := h.logger(c.Request.Context()).With().Str("func", "RegisterJob").Logger()
@@ -103,5 +103,5 @@ func (h *JobHandler) RegisterJob(c *gin.Context) {
 		Int64("job_id", req.JobID).
 		Msg("job registered successfully")
 
-	c.JSON(http.StatusCreated, response)
+	respondWithSuccessAndStatus(c, http.StatusCreated, response, "Job registered successfully")
 }
