@@ -15,8 +15,9 @@ import (
 )
 
 type Application struct {
-	PasskeyService *PasskeyService
-	JobService     *JobService
+	PasskeyService   *PasskeyService
+	JobService       *JobService
+	ExecutionService *ExecutionService
 }
 
 type AppConfig struct {
@@ -34,6 +35,9 @@ type AppConfig struct {
 	BaseSepoliaRPCURL     *string
 	OptimismSepoliaRPCURL *string
 	PolygonAmoyRPCURL     *string
+
+	// Private key for signing user operations
+	PrivateKey *string
 }
 
 func NewApplication(ctx context.Context, config AppConfig) *Application {
@@ -75,9 +79,16 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 
 	go pollingService.Start(ctx)
 
+	// Execution Service
+	executionService, err := NewExecutionService(blockchainService, *config.PrivateKey)
+	if err != nil {
+		log.Fatalf("failed to create execution service: %v", err)
+	}
+
 	return &Application{
-		PasskeyService: passkeyService,
-		JobService:     jobService,
+		PasskeyService:   passkeyService,
+		JobService:       jobService,
+		ExecutionService: executionService,
 	}
 }
 

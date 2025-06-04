@@ -1,9 +1,13 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"math/big"
+	"net/http"
 	"strings"
 
 	"github.com/ethaccount/backend/src/domain"
@@ -252,4 +256,101 @@ func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs [
 		Msg("successfully retrieved execution configs in batch")
 
 	return results, nil
+}
+
+// GetBundlerURL returns the bundler URL for a given chain ID
+func (b *BlockchainService) GetBundlerURL(chainId int64) (string, error) {
+	switch chainId {
+	case 11155111: // Sepolia
+		return *b.SepoliaRPCURL, nil
+	case 421614: // Arbitrum Sepolia
+		return *b.ArbitrumSepoliaRPCURL, nil
+	case 84532: // Base Sepolia
+		return *b.BaseSepoliaRPCURL, nil
+	case 11155420: // Optimism Sepolia
+		return *b.OptimismSepoliaRPCURL, nil
+	case 80002: // Polygon Amoy
+		return *b.PolygonAmoyRPCURL, nil
+	default:
+		return "", fmt.Errorf("unsupported chain id for bundler: %d", chainId)
+	}
+}
+
+// SendUserOperation sends a user operation to the bundler
+func (b *BlockchainService) SendUserOperation(ctx context.Context, userOp *domain.UserOperation, entryPoint string, chainId int64) (string, error) {
+	b.logger(ctx).Debug().
+		Str("sender", userOp.Sender).
+		Int64("chain_id", chainId).
+		Str("entry_point", entryPoint).
+		Msg("sending user operation to bundler")
+
+	bundlerURL, err := b.GetBundlerURL(chainId)
+	if err != nil {
+		b.logger(ctx).Error().Err(err).
+			Int64("chain_id", chainId).
+			Msg("failed to get bundler URL")
+		return "", err
+	}
+
+	// Prepare JSON-RPC request
+	rpcRequest := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "eth_sendUserOperation",
+		"params":  []interface{}{userOp, entryPoint},
+		"id":      1,
+	}
+
+	requestBody, err := json.Marshal(rpcRequest)
+	if err != nil {
+		b.logger(ctx).Error().Err(err).Msg("failed to marshal RPC request")
+		return "", fmt.Errorf("failed to marshal RPC request: %w", err)
+	}
+
+	// Send HTTP request to bundler
+	resp, err := http.Post(bundlerURL, "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		b.logger(ctx).Error().Err(err).
+			Str("bundler_url", bundlerURL).
+			Msg("failed to send request to bundler")
+		return "", fmt.Errorf("failed to send request to bundler: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		b.logger(ctx).Error().Err(err).Msg("failed to read bundler response")
+		return "", fmt.Errorf("failed to read bundler response: %w", err)
+	}
+
+	// Parse JSON-RPC response
+	var rpcResponse struct {
+		JSONRPC string      `json:"jsonrpc"`
+		ID      int         `json:"id"`
+		Result  string      `json:"result,omitempty"`
+		Error   interface{} `json:"error,omitempty"`
+	}
+
+	if err := json.Unmarshal(responseBody, &rpcResponse); err != nil {
+		b.logger(ctx).Error().Err(err).
+			Str("response_body", string(responseBody)).
+			Msg("failed to parse bundler response")
+		return "", fmt.Errorf("failed to parse bundler response: %w", err)
+	}
+
+	// Check for RPC error
+	if rpcResponse.Error != nil {
+		b.logger(ctx).Error().
+			Interface("rpc_error", rpcResponse.Error).
+			Msg("bundler returned error")
+		return "", fmt.Errorf("bundler error: %v", rpcResponse.Error)
+	}
+
+	b.logger(ctx).Info().
+		Str("user_op_hash", rpcResponse.Result).
+		Str("sender", userOp.Sender).
+		Int64("chain_id", chainId).
+		Msg("successfully sent user operation to bundler")
+
+	return rpcResponse.Result, nil
 }

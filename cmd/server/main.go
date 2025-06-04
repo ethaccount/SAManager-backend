@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/ethaccount/backend/src/handler"
 	"github.com/ethaccount/backend/src/service"
@@ -93,6 +94,15 @@ func initAppConfig() service.AppConfig {
 		log.Fatalf("One or more RPC URLs are not set in .env file")
 	}
 
+	// Private key for signing user operations
+	privateKey := os.Getenv("PRIVATE_KEY")
+	if privateKey == "" {
+		log.Fatalf("PRIVATE_KEY not set in .env file")
+	}
+
+	// remove 0x prefix if it exists
+	privateKey = strings.TrimPrefix(privateKey, "0x")
+
 	return service.AppConfig{
 		LogLevel:              &logLevel,
 		DSN:                   &dsn,
@@ -102,6 +112,7 @@ func initAppConfig() service.AppConfig {
 		BaseSepoliaRPCURL:     &baseSepoliaRPCURL,
 		OptimismSepoliaRPCURL: &optimismSepoliaRPCURL,
 		PolygonAmoyRPCURL:     &polygonAmoyRPCURL,
+		PrivateKey:            &privateKey,
 	}
 }
 
