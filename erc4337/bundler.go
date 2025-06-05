@@ -2,6 +2,7 @@ package erc4337
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -89,6 +90,12 @@ func (b *BundlerClient) EstimateUserOperationGas(ctx context.Context, op *UserOp
 func (b *BundlerClient) SendUserOperation(ctx context.Context, op *UserOperation, entryPoint common.Address) (common.Hash, error) {
 	var result common.Hash
 	err := b.client.CallContext(ctx, &result, "eth_sendUserOperation", op, entryPoint)
+	if err != nil {
+		if rpcErr, ok := err.(rpc.DataError); ok {
+			fmt.Printf("RPC Error - Message: %s, Data: %v\n",
+				rpcErr.Error(), rpcErr.ErrorData())
+		}
+	}
 	return result, err
 }
 

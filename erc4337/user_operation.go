@@ -202,14 +202,100 @@ func (uo *UserOperation) UnmarshalJSON(data []byte) error {
 // PackedUserOp represents the packed version of UserOperation for ERC-4337
 type PackedUserOp struct {
 	Sender             common.Address `json:"sender"`
-	Nonce              string         `json:"nonce"`
+	Nonce              *big.Int       `json:"nonce"`
 	InitCode           hexutil.Bytes  `json:"initCode"`
 	CallData           hexutil.Bytes  `json:"callData"`
 	AccountGasLimits   hexutil.Bytes  `json:"accountGasLimits"`
-	PreVerificationGas hexutil.Bytes  `json:"preVerificationGas"`
+	PreVerificationGas *big.Int       `json:"preVerificationGas"`
 	GasFees            hexutil.Bytes  `json:"gasFees"`
 	PaymasterAndData   hexutil.Bytes  `json:"paymasterAndData"`
 	Signature          hexutil.Bytes  `json:"signature"`
+}
+
+// MarshalJSON implements custom JSON marshaling for PackedUserOp
+func (puo *PackedUserOp) MarshalJSON() ([]byte, error) {
+	type Alias PackedUserOp
+	aux := struct {
+		Nonce              string `json:"nonce"`
+		PreVerificationGas string `json:"preVerificationGas"`
+		*Alias
+	}{
+		Alias: (*Alias)(puo),
+	}
+
+	// Convert Nonce to hex string
+	if puo.Nonce != nil {
+		aux.Nonce = fmt.Sprintf("0x%x", puo.Nonce)
+	} else {
+		aux.Nonce = "0x0"
+	}
+
+	// Convert PreVerificationGas to hex string
+	if puo.PreVerificationGas != nil {
+		aux.PreVerificationGas = fmt.Sprintf("0x%x", puo.PreVerificationGas)
+	} else {
+		aux.PreVerificationGas = "0x0"
+	}
+
+	return json.Marshal(aux)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for PackedUserOp
+func (puo *PackedUserOp) UnmarshalJSON(data []byte) error {
+	type Alias PackedUserOp
+	aux := struct {
+		Nonce              string `json:"nonce"`
+		PreVerificationGas string `json:"preVerificationGas"`
+		*Alias
+	}{
+		Alias: (*Alias)(puo),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Helper function to parse hex string to big.Int
+	parseHexBig := func(hexStr string) (*big.Int, error) {
+		if hexStr == "" {
+			return big.NewInt(0), nil
+		}
+		// Remove 0x prefix if present
+		if len(hexStr) >= 2 && hexStr[:2] == "0x" {
+			hexStr = hexStr[2:]
+		}
+		// Handle empty string after removing 0x
+		if hexStr == "" {
+			return big.NewInt(0), nil
+		}
+		// Parse using big.Int SetString with base 16
+		result := new(big.Int)
+		_, ok := result.SetString(hexStr, 16)
+		if !ok {
+			return nil, fmt.Errorf("invalid hex string: %s", hexStr)
+		}
+		return result, nil
+	}
+
+	// Parse Nonce
+	if aux.Nonce != "" {
+		nonce, err := parseHexBig(aux.Nonce)
+		if err != nil {
+			return fmt.Errorf("invalid nonce: %v", err)
+		}
+		puo.Nonce = nonce
+	}
+
+	// Parse PreVerificationGas
+	if aux.PreVerificationGas != "" {
+		preVerificationGas, err := parseHexBig(aux.PreVerificationGas)
+		if err != nil {
+			return fmt.Errorf("invalid preVerificationGas: %v", err)
+		}
+		puo.PreVerificationGas = preVerificationGas
+	}
+
+	return nil
 }
 
 // PackUserOp packs a UserOperation into a PackedUserOp according to ERC-4337 specification
@@ -222,9 +308,9 @@ func (uo *UserOperation) PackUserOp() *PackedUserOp {
 
 	// Pack nonce
 	if uo.Nonce != nil {
-		packed.Nonce = fmt.Sprintf("0x%x", (*big.Int)(uo.Nonce))
+		packed.Nonce = (*big.Int)(uo.Nonce)
 	} else {
-		packed.Nonce = "0x0"
+		packed.Nonce = big.NewInt(0)
 	}
 
 	// Pack initCode (factory + factoryData if they exist)
@@ -237,7 +323,7 @@ func (uo *UserOperation) PackUserOp() *PackedUserOp {
 		packed.InitCode = hexutil.Bytes{}
 	}
 
-	// Pack accountGasLimits (verificationGasLimit + callGasLimit, each 16 bytes)
+	// Pack accountGasLimits (verificationGasLimit + callGasLimit, each 16 bytes with left padding)
 	accountGasLimits := make([]byte, 32)
 	if uo.VerificationGasLimit != nil {
 		verificationBytes := (*big.Int)(uo.VerificationGasLimit).Bytes()
@@ -245,19 +331,18 @@ func (uo *UserOperation) PackUserOp() *PackedUserOp {
 	}
 	if uo.CallGasLimit != nil {
 		callBytes := (*big.Int)(uo.CallGasLimit).Bytes()
-		copy(accountGasLimits[32-len(callBytes):32], callBytes)
+		copy(accountGasLimits[16+16-len(callBytes):32], callBytes)
 	}
 	packed.AccountGasLimits = accountGasLimits
 
-	// Pack preVerificationGas (32 bytes)
-	preVerificationGas := make([]byte, 32)
+	// Pack preVerificationGas as *big.Int
 	if uo.PreVerificationGas != nil {
-		preVerBytes := (*big.Int)(uo.PreVerificationGas).Bytes()
-		copy(preVerificationGas[32-len(preVerBytes):32], preVerBytes)
+		packed.PreVerificationGas = (*big.Int)(uo.PreVerificationGas)
+	} else {
+		packed.PreVerificationGas = big.NewInt(0)
 	}
-	packed.PreVerificationGas = preVerificationGas
 
-	// Pack gasFees (maxPriorityFeePerGas + maxFeePerGas, each 16 bytes)
+	// Pack gasFees (maxPriorityFeePerGas + maxFeePerGas, each 16 bytes with left padding)
 	gasFees := make([]byte, 32)
 	if uo.MaxPriorityFeePerGas != nil {
 		priorityBytes := (*big.Int)(uo.MaxPriorityFeePerGas).Bytes()
@@ -265,19 +350,19 @@ func (uo *UserOperation) PackUserOp() *PackedUserOp {
 	}
 	if uo.MaxFeePerGas != nil {
 		maxFeeBytes := (*big.Int)(uo.MaxFeePerGas).Bytes()
-		copy(gasFees[32-len(maxFeeBytes):32], maxFeeBytes)
+		copy(gasFees[16+16-len(maxFeeBytes):32], maxFeeBytes)
 	}
 	packed.GasFees = gasFees
 
 	// Pack paymasterAndData (paymaster + paymasterVerificationGasLimit + paymasterPostOpGasLimit + paymasterData)
-	if uo.Paymaster != nil && len(uo.PaymasterData) > 0 {
+	if uo.Paymaster != nil {
 		// Calculate total size: 20 (paymaster) + 16 (verificationGasLimit) + 16 (postOpGasLimit) + paymasterData length
 		paymasterAndData := make([]byte, 0, 52+len(uo.PaymasterData))
 
 		// Add paymaster address
 		paymasterAndData = append(paymasterAndData, uo.Paymaster.Bytes()...)
 
-		// Add paymasterVerificationGasLimit (16 bytes)
+		// Add paymasterVerificationGasLimit (16 bytes with left padding)
 		verificationLimit := make([]byte, 16)
 		if uo.PaymasterVerificationGasLimit != nil {
 			verificationBytes := (*big.Int)(uo.PaymasterVerificationGasLimit).Bytes()
@@ -285,7 +370,7 @@ func (uo *UserOperation) PackUserOp() *PackedUserOp {
 		}
 		paymasterAndData = append(paymasterAndData, verificationLimit...)
 
-		// Add paymasterPostOpGasLimit (16 bytes)
+		// Add paymasterPostOpGasLimit (16 bytes with left padding)
 		postOpLimit := make([]byte, 16)
 		if uo.PaymasterPostOpGasLimit != nil {
 			postOpBytes := (*big.Int)(uo.PaymasterPostOpGasLimit).Bytes()
@@ -293,7 +378,7 @@ func (uo *UserOperation) PackUserOp() *PackedUserOp {
 		}
 		paymasterAndData = append(paymasterAndData, postOpLimit...)
 
-		// Add paymasterData
+		// Add paymasterData (even if empty)
 		paymasterAndData = append(paymasterAndData, uo.PaymasterData...)
 
 		packed.PaymasterAndData = paymasterAndData
@@ -312,14 +397,10 @@ func (uo *UserOperation) GetUserOpHashV07(chainId *big.Int) (common.Hash, error)
 	hashedCallData := crypto.Keccak256Hash(packed.CallData)
 	hashedPaymasterAndData := crypto.Keccak256Hash(packed.PaymasterAndData)
 
-	// Parse nonce from hex string to big.Int
-	nonce := new(big.Int)
-	if packed.Nonce != "" {
-		var success bool
-		nonce, success = nonce.SetString(packed.Nonce[2:], 16) // Remove 0x prefix
-		if !success {
-			return common.Hash{}, fmt.Errorf("invalid nonce format: %s", packed.Nonce)
-		}
+	// Use nonce directly as big.Int
+	nonce := packed.Nonce
+	if nonce == nil {
+		nonce = big.NewInt(0)
 	}
 
 	// Create ABI types for encoding
@@ -339,113 +420,18 @@ func (uo *UserOperation) GetUserOpHashV07(chainId *big.Int) (common.Hash, error)
 		{Type: bytes32Type}, // hashedPaymasterAndData
 	}
 
-	// Convert bytes to [32]byte for encoding
+	// Convert accountGasLimits and gasFees to [32]byte for bytes32 encoding
 	var accountGasLimits [32]byte
 	copy(accountGasLimits[:], packed.AccountGasLimits)
-
-	var preVerificationGas *big.Int
-	if len(packed.PreVerificationGas) > 0 {
-		preVerificationGas = new(big.Int).SetBytes(packed.PreVerificationGas)
-	} else {
-		preVerificationGas = big.NewInt(0)
-	}
 
 	var gasFees [32]byte
 	copy(gasFees[:], packed.GasFees)
 
-	userOpEncoded, err := userOpArgs.Pack(
-		packed.Sender,
-		nonce,
-		hashedInitCode,
-		hashedCallData,
-		accountGasLimits,
-		preVerificationGas,
-		gasFees,
-		hashedPaymasterAndData,
-	)
-	if err != nil {
-		return common.Hash{}, fmt.Errorf("failed to encode user operation: %v", err)
-	}
-
-	// Hash the encoded user operation
-	userOpHash := crypto.Keccak256Hash(userOpEncoded)
-
-	// Second level encoding: encode the hash with EntryPoint and chainId
-	finalArgs := abi.Arguments{
-		{Type: bytes32Type}, // userOpHash
-		{Type: addressType}, // EntryPointV07
-		{Type: uint256Type}, // chainId
-	}
-
-	finalEncoded, err := finalArgs.Pack(
-		userOpHash,
-		EntryPointV07,
-		chainId,
-	)
-	if err != nil {
-		return common.Hash{}, fmt.Errorf("failed to encode final hash: %v", err)
-	}
-
-	// Return the final keccak256 hash
-	return crypto.Keccak256Hash(finalEncoded), nil
-}
-
-// getUserOpHashV07 computes the user operation hash for ERC-4337 v0.7 from a PackedUserOp
-func getUserOpHashV07(packed *PackedUserOp, chainId *big.Int) (common.Hash, error) {
-	// Hash the initCode, callData, and paymasterAndData
-	hashedInitCode := crypto.Keccak256Hash(packed.InitCode)
-	hashedCallData := crypto.Keccak256Hash(packed.CallData)
-	hashedPaymasterAndData := crypto.Keccak256Hash(packed.PaymasterAndData)
-
-	// Parse nonce from hex string to big.Int
-	nonce := new(big.Int)
-	if packed.Nonce != "" {
-		// Handle nonce with or without 0x prefix
-		nonceStr := packed.Nonce
-		if len(nonceStr) >= 2 && nonceStr[:2] == "0x" {
-			nonceStr = nonceStr[2:]
-		}
-		if nonceStr == "" {
-			nonce = big.NewInt(0)
-		} else {
-			var success bool
-			nonce, success = nonce.SetString(nonceStr, 16)
-			if !success {
-				return common.Hash{}, fmt.Errorf("invalid nonce format: %s", packed.Nonce)
-			}
-		}
-	}
-
-	// Create ABI types for encoding
-	addressType, _ := abi.NewType("address", "", nil)
-	uint256Type, _ := abi.NewType("uint256", "", nil)
-	bytes32Type, _ := abi.NewType("bytes32", "", nil)
-
-	// First level encoding: encode the user operation data
-	userOpArgs := abi.Arguments{
-		{Type: addressType}, // sender
-		{Type: uint256Type}, // nonce
-		{Type: bytes32Type}, // hashedInitCode
-		{Type: bytes32Type}, // hashedCallData
-		{Type: bytes32Type}, // accountGasLimits
-		{Type: uint256Type}, // preVerificationGas
-		{Type: bytes32Type}, // gasFees
-		{Type: bytes32Type}, // hashedPaymasterAndData
-	}
-
-	// Convert bytes to [32]byte for encoding
-	var accountGasLimits [32]byte
-	copy(accountGasLimits[:], packed.AccountGasLimits)
-
-	var preVerificationGas *big.Int
-	if len(packed.PreVerificationGas) > 0 {
-		preVerificationGas = new(big.Int).SetBytes(packed.PreVerificationGas)
-	} else {
+	// Use preVerificationGas directly as *big.Int
+	preVerificationGas := packed.PreVerificationGas
+	if preVerificationGas == nil {
 		preVerificationGas = big.NewInt(0)
 	}
-
-	var gasFees [32]byte
-	copy(gasFees[:], packed.GasFees)
 
 	userOpEncoded, err := userOpArgs.Pack(
 		packed.Sender,

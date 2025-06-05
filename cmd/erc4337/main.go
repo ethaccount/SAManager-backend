@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -39,6 +40,64 @@ const userOpJSON = `{
 // Block represents a block header with baseFeePerGas
 type Block struct {
 	BaseFeePerGas string `json:"baseFeePerGas"`
+}
+
+// extractNonceKey extracts the nonce key by removing the trailing 8 bytes (64 bits)
+func extractNonceKey(nonce *hexutil.Big) (*big.Int, error) {
+	if nonce == nil {
+		return nil, fmt.Errorf("nonce is nil")
+	}
+
+	nonceBytes := nonce.ToInt().Bytes()
+	if len(nonceBytes) < 8 {
+		return nil, fmt.Errorf("nonce too short to extract key")
+	}
+
+	// Pad to 32 bytes if needed
+	paddedNonce := make([]byte, 32)
+	copy(paddedNonce[32-len(nonceBytes):], nonceBytes)
+
+	// Extract key by taking first 24 bytes (removing trailing 8 bytes)
+	keyBytes := paddedNonce[:24]
+	key := new(big.Int).SetBytes(keyBytes)
+
+	return key, nil
+}
+
+// getCurrentNonce calls the entrypoint contract's getNonce function
+func getCurrentNonce(ctx context.Context, rpcClient *rpc.Client, sender common.Address, key *big.Int) (*big.Int, error) {
+	// Prepare the call data for getNonce(address,uint192)
+	// Function selector: getNonce(address,uint192) = 0x35567e1a
+	callData := "0x35567e1a"
+
+	// Encode sender address (32 bytes)
+	senderBytes := make([]byte, 32)
+	copy(senderBytes[12:], sender.Bytes())
+	callData += fmt.Sprintf("%x", senderBytes)
+
+	// Encode key (32 bytes, but only 24 bytes are significant for uint192)
+	keyBytes := make([]byte, 32)
+	key.FillBytes(keyBytes)
+	callData += fmt.Sprintf("%x", keyBytes)
+
+	// Make the eth_call
+	var result string
+	err := rpcClient.CallContext(ctx, &result, "eth_call", map[string]interface{}{
+		"to":   erc4337.EntryPointV07,
+		"data": callData,
+	}, "latest")
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to call getNonce: %w", err)
+	}
+
+	// Parse the result
+	nonce := new(big.Int)
+	if err := nonce.UnmarshalText([]byte(result)); err != nil {
+		return nil, fmt.Errorf("failed to parse nonce result: %w", err)
+	}
+
+	return nonce, nil
 }
 
 // getMaxFeePerGas fetches the latest block and max priority fee, then calculates maxFeePerGas
@@ -135,12 +194,31 @@ func main() {
 		log.Fatalf("Failed to connect to bundler: %v", err)
 	}
 
-	// Create direct RPC client for gas fee calculations
+	// Create direct RPC client for gas fee calculations and nonce fetching
 	rpcClient, err := rpc.DialContext(ctx, rpcUrl)
 	if err != nil {
 		log.Fatalf("Failed to create RPC client: %v", err)
 	}
 	defer rpcClient.Close()
+
+	// Extract nonce key from the original nonce and get current nonce from entrypoint
+	nonceKey, err := extractNonceKey(userOp.Nonce)
+	if err != nil {
+		log.Fatalf("Failed to extract nonce key: %v", err)
+	}
+
+	fmt.Printf("Extracted nonce key: 0x%x\n", nonceKey)
+
+	// Get current nonce from entrypoint contract
+	currentNonce, err := getCurrentNonce(ctx, rpcClient, userOp.Sender, nonceKey)
+	if err != nil {
+		log.Fatalf("Failed to get current nonce: %v", err)
+	}
+
+	fmt.Printf("Current nonce from entrypoint: 0x%x\n", currentNonce)
+
+	// Update user operation with current nonce
+	userOp.Nonce = (*hexutil.Big)(currentNonce)
 
 	// Add paymaster
 	paymaster := common.HexToAddress("0xcD1c62f36A99f306948dB76c35Bbc1A639f92ce8")
@@ -154,7 +232,7 @@ func main() {
 		log.Fatalf("Failed to decode dummy signature: %v", err)
 	}
 
-	originalSignature := userOp.Signature
+	leadingSignature := userOp.Signature
 
 	// append dummy signature
 	userOp.Signature = append(userOp.Signature, decodedDummySignature...)
@@ -194,35 +272,40 @@ func main() {
 	userOp.MaxFeePerGas = (*hexutil.Big)(maxFeePerGas)
 	userOp.MaxPriorityFeePerGas = (*hexutil.Big)(maxPriorityFeePerGas)
 
-	// Calculate hash
+	// print packed user operation
+	packedUserOp := userOp.PackUserOp()
+	packedUserOpJSON, err := json.MarshalIndent(packedUserOp, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to marshal packed user operation: %v", err)
+	}
+	fmt.Printf("Packed User Operation: %s\n", string(packedUserOpJSON))
+
+	// Print the user operation
+	userOpJSON, err := json.MarshalIndent(userOp, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to marshal user operation: %v", err)
+	}
+	fmt.Printf("User Operation: %s\n", string(userOpJSON))
+
+	// userOpHash
 	hash, err := userOp.GetUserOpHashV07(big.NewInt(11155111))
 	if err != nil {
 		log.Fatalf("Failed to calculate user operation hash: %v", err)
 	}
 	fmt.Printf("User Operation Hash: %s\n", hash.Hex())
 
-	// Sign the hash using Ethereum message format
-	personalHash := crypto.Keccak256Hash(
-		[]byte("\x19Ethereum Signed Message:\n32"),
-		hash.Bytes(),
-	)
-
-	signature, err := crypto.Sign(personalHash.Bytes(), privateKey)
+	signature, err := crypto.Sign(personalSignHash(hash.Bytes()).Bytes(), privateKey)
 	if err != nil {
 		log.Fatalf("Failed to sign user operation hash: %v", err)
 	}
 
-	fmt.Printf("Signature: 0x%x\n", signature)
+	// https://stackoverflow.com/questions/69762108/implementing-ethereum-personal-sign-eip-191-from-go-ethereum-gives-different-s
+	signature[64] += 27
+
+	fmt.Println("0x" + hex.EncodeToString(signature))
 
 	// Update the signature in the user operation
-	userOp.Signature = append(originalSignature, signature...)
-
-	// print the user operation
-	userOpJSON, err := json.MarshalIndent(userOp, "", "  ")
-	if err != nil {
-		log.Fatalf("Failed to marshal user operation: %v", err)
-	}
-	fmt.Printf("User Operation: %s\n", string(userOpJSON))
+	userOp.Signature = append(leadingSignature, signature...)
 
 	// Send the user operation
 	userOpHash, err := c.SendUserOperation(ctx, &userOp, erc4337.EntryPointV07)
@@ -270,4 +353,9 @@ func main() {
 	}
 
 	fmt.Printf("Failed to get user operation receipt after %d attempts\n", maxAttempts)
+}
+
+func personalSignHash(data []byte) common.Hash {
+	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)
+	return crypto.Keccak256Hash([]byte(msg))
 }

@@ -349,7 +349,7 @@ func TestUserOperation_PackUserOp(t *testing.T) {
 			},
 			expected: &PackedUserOp{
 				Sender:   common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:    "0x7b",
+				Nonce:    big.NewInt(123),
 				InitCode: append(common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd").Bytes(), hexutil.MustDecode("0x1234")...),
 				CallData: hexutil.MustDecode("0x5678"),
 				AccountGasLimits: func() hexutil.Bytes {
@@ -362,12 +362,7 @@ func TestUserOperation_PackUserOp(t *testing.T) {
 					copy(limits[32-len(callBytes):32], callBytes)
 					return limits
 				}(),
-				PreVerificationGas: func() hexutil.Bytes {
-					gas := make([]byte, 32)
-					preVerBytes := big.NewInt(3000000).Bytes()
-					copy(gas[32-len(preVerBytes):32], preVerBytes)
-					return gas
-				}(),
+				PreVerificationGas: big.NewInt(3000000),
 				GasFees: func() hexutil.Bytes {
 					fees := make([]byte, 32)
 					// MaxPriorityFeePerGas (1000000000) in first 16 bytes
@@ -418,7 +413,7 @@ func TestUserOperation_PackUserOp(t *testing.T) {
 			},
 			expected: &PackedUserOp{
 				Sender:   common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:    "0x0",
+				Nonce:    big.NewInt(0),
 				InitCode: hexutil.Bytes{},
 				CallData: hexutil.MustDecode("0x5678"),
 				AccountGasLimits: func() hexutil.Bytes {
@@ -431,12 +426,7 @@ func TestUserOperation_PackUserOp(t *testing.T) {
 					copy(limits[32-len(callBytes):32], callBytes)
 					return limits
 				}(),
-				PreVerificationGas: func() hexutil.Bytes {
-					gas := make([]byte, 32)
-					preVerBytes := big.NewInt(50000).Bytes()
-					copy(gas[32-len(preVerBytes):32], preVerBytes)
-					return gas
-				}(),
+				PreVerificationGas: big.NewInt(50000),
 				GasFees: func() hexutil.Bytes {
 					fees := make([]byte, 32)
 					// MaxPriorityFeePerGas (1000000) in first 16 bytes
@@ -470,7 +460,7 @@ func TestUserOperation_PackUserOp(t *testing.T) {
 			},
 			expected: &PackedUserOp{
 				Sender:   common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:    "0x1c8",
+				Nonce:    big.NewInt(456),
 				InitCode: append(common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd").Bytes(), hexutil.MustDecode("0xfacade")...),
 				CallData: hexutil.MustDecode("0x5678"),
 				AccountGasLimits: func() hexutil.Bytes {
@@ -481,12 +471,7 @@ func TestUserOperation_PackUserOp(t *testing.T) {
 					copy(limits[32-len(callBytes):32], callBytes)
 					return limits
 				}(),
-				PreVerificationGas: func() hexutil.Bytes {
-					gas := make([]byte, 32)
-					preVerBytes := big.NewInt(50000).Bytes()
-					copy(gas[32-len(preVerBytes):32], preVerBytes)
-					return gas
-				}(),
+				PreVerificationGas: big.NewInt(50000),
 				GasFees: func() hexutil.Bytes {
 					fees := make([]byte, 32)
 					priorityBytes := big.NewInt(1000000).Bytes()
@@ -518,11 +503,11 @@ func TestUserOperation_PackUserOp(t *testing.T) {
 			},
 			expected: &PackedUserOp{
 				Sender:             common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:              "0x0",
+				Nonce:              big.NewInt(0),
 				InitCode:           hexutil.Bytes{},
 				CallData:           hexutil.MustDecode("0x5678"),
 				AccountGasLimits:   make([]byte, 32), // all zeros
-				PreVerificationGas: make([]byte, 32), // all zeros
+				PreVerificationGas: big.NewInt(0),    // zero big.Int
 				GasFees:            make([]byte, 32), // all zeros
 				PaymasterAndData:   hexutil.Bytes{},
 				Signature:          hexutil.MustDecode("0xabcd"),
@@ -572,9 +557,8 @@ func TestUserOperation_PackUserOp_ByteOrdering(t *testing.T) {
 	assert.Equal(t, expectedAccountGasLimits, []byte(packed.AccountGasLimits))
 
 	// Verify PreVerificationGas byte ordering
-	expectedPreVerificationGas := make([]byte, 32)
-	copy(expectedPreVerificationGas[29:32], []byte{0xde, 0xf0, 0x12})
-	assert.Equal(t, expectedPreVerificationGas, []byte(packed.PreVerificationGas))
+	// Verify PreVerificationGas
+	assert.Equal(t, big.NewInt(0xdef012), packed.PreVerificationGas)
 
 	// Verify GasFees byte ordering
 	expectedGasFees := make([]byte, 32)
@@ -588,160 +572,89 @@ func TestUserOperation_PackUserOp_ByteOrdering(t *testing.T) {
 func TestGetUserOpHashV07(t *testing.T) {
 	tests := []struct {
 		name        string
-		packedOp    *PackedUserOp
+		userOp      *UserOperation
 		chainId     *big.Int
 		wantErr     bool
 		errContains string
 	}{
 		{
-			name: "complete packed user operation",
-			packedOp: &PackedUserOp{
-				Sender:   common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:    "0x7b", // 123 in hex
-				InitCode: append(common.HexToAddress("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd").Bytes(), hexutil.MustDecode("0x1234")...),
-				CallData: hexutil.MustDecode("0x5678"),
-				AccountGasLimits: func() hexutil.Bytes {
-					limits := make([]byte, 32)
-					// VerificationGasLimit (2000000) in first 16 bytes
-					verificationBytes := big.NewInt(2000000).Bytes()
-					copy(limits[16-len(verificationBytes):16], verificationBytes)
-					// CallGasLimit (1000000) in last 16 bytes
-					callBytes := big.NewInt(1000000).Bytes()
-					copy(limits[32-len(callBytes):32], callBytes)
-					return limits
-				}(),
-				PreVerificationGas: func() hexutil.Bytes {
-					gas := make([]byte, 32)
-					preVerBytes := big.NewInt(3000000).Bytes()
-					copy(gas[32-len(preVerBytes):32], preVerBytes)
-					return gas
-				}(),
-				GasFees: func() hexutil.Bytes {
-					fees := make([]byte, 32)
-					// MaxPriorityFeePerGas (1000000000) in first 16 bytes
-					priorityBytes := big.NewInt(1000000000).Bytes()
-					copy(fees[16-len(priorityBytes):16], priorityBytes)
-					// MaxFeePerGas (2000000000) in last 16 bytes
-					maxFeeBytes := big.NewInt(2000000000).Bytes()
-					copy(fees[32-len(maxFeeBytes):32], maxFeeBytes)
-					return fees
-				}(),
-				PaymasterAndData: func() hexutil.Bytes {
-					data := make([]byte, 0, 52+2)
-					// Paymaster address (20 bytes)
-					data = append(data, common.HexToAddress("0xfedcbafedcbafedcbafedcbafedcbafedcbafeda").Bytes()...)
-					// PaymasterVerificationGasLimit (16 bytes)
-					verificationLimit := make([]byte, 16)
-					verificationBytes := big.NewInt(500000).Bytes()
-					copy(verificationLimit[16-len(verificationBytes):16], verificationBytes)
-					data = append(data, verificationLimit...)
-					// PaymasterPostOpGasLimit (16 bytes)
-					postOpLimit := make([]byte, 16)
-					postOpBytes := big.NewInt(100000).Bytes()
-					copy(postOpLimit[16-len(postOpBytes):16], postOpBytes)
-					data = append(data, postOpLimit...)
-					// PaymasterData
-					data = append(data, hexutil.MustDecode("0x9abc")...)
-					return data
-				}(),
-				Signature: hexutil.MustDecode("0xdef0"),
+			name: "complete user operation",
+			userOp: &UserOperation{
+				Sender:                        common.HexToAddress("0x1234567890123456789012345678901234567890"),
+				Nonce:                         (*hexutil.Big)(big.NewInt(123)),
+				Factory:                       addressPtr("0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"),
+				FactoryData:                   hexutil.MustDecode("0x1234"),
+				CallData:                      hexutil.MustDecode("0x5678"),
+				CallGasLimit:                  (*hexutil.Big)(big.NewInt(1000000)),
+				VerificationGasLimit:          (*hexutil.Big)(big.NewInt(2000000)),
+				PreVerificationGas:            (*hexutil.Big)(big.NewInt(3000000)),
+				MaxPriorityFeePerGas:          (*hexutil.Big)(big.NewInt(1000000000)),
+				MaxFeePerGas:                  (*hexutil.Big)(big.NewInt(2000000000)),
+				Paymaster:                     addressPtr("0xfedcbafedcbafedcbafedcbafedcbafedcbafeda"),
+				PaymasterVerificationGasLimit: (*hexutil.Big)(big.NewInt(500000)),
+				PaymasterPostOpGasLimit:       (*hexutil.Big)(big.NewInt(100000)),
+				PaymasterData:                 hexutil.MustDecode("0x9abc"),
+				Signature:                     hexutil.MustDecode("0xdef0"),
 			},
 			chainId: big.NewInt(1), // Ethereum mainnet
 			wantErr: false,
 		},
 		{
-			name: "minimal packed user operation",
-			packedOp: &PackedUserOp{
-				Sender:             common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:              "0x0",
-				InitCode:           hexutil.Bytes{},
-				CallData:           hexutil.MustDecode("0x5678"),
-				AccountGasLimits:   make([]byte, 32),
-				PreVerificationGas: make([]byte, 32),
-				GasFees:            make([]byte, 32),
-				PaymasterAndData:   hexutil.Bytes{},
-				Signature:          hexutil.MustDecode("0xabcd"),
+			name: "minimal user operation",
+			userOp: &UserOperation{
+				Sender:               common.HexToAddress("0x1234567890123456789012345678901234567890"),
+				Nonce:                (*hexutil.Big)(big.NewInt(0)),
+				Factory:              nil,
+				FactoryData:          hexutil.Bytes{},
+				CallData:             hexutil.MustDecode("0x5678"),
+				CallGasLimit:         (*hexutil.Big)(big.NewInt(100000)),
+				VerificationGasLimit: (*hexutil.Big)(big.NewInt(200000)),
+				PreVerificationGas:   (*hexutil.Big)(big.NewInt(50000)),
+				MaxPriorityFeePerGas: (*hexutil.Big)(big.NewInt(1000000)),
+				MaxFeePerGas:         (*hexutil.Big)(big.NewInt(2000000)),
+				Paymaster:            nil,
+				PaymasterData:        hexutil.Bytes{},
+				Signature:            hexutil.MustDecode("0xabcd"),
 			},
 			chainId: big.NewInt(137), // Polygon
 			wantErr: false,
 		},
 		{
 			name: "different chain id",
-			packedOp: &PackedUserOp{
-				Sender:             common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:              "0x1",
-				InitCode:           hexutil.Bytes{},
-				CallData:           hexutil.MustDecode("0x1234"),
-				AccountGasLimits:   make([]byte, 32),
-				PreVerificationGas: make([]byte, 32),
-				GasFees:            make([]byte, 32),
-				PaymasterAndData:   hexutil.Bytes{},
-				Signature:          hexutil.MustDecode("0x5678"),
+			userOp: &UserOperation{
+				Sender:               common.HexToAddress("0x1234567890123456789012345678901234567890"),
+				Nonce:                (*hexutil.Big)(big.NewInt(1)),
+				Factory:              nil,
+				FactoryData:          hexutil.Bytes{},
+				CallData:             hexutil.MustDecode("0x1234"),
+				CallGasLimit:         (*hexutil.Big)(big.NewInt(100000)),
+				VerificationGasLimit: (*hexutil.Big)(big.NewInt(200000)),
+				PreVerificationGas:   (*hexutil.Big)(big.NewInt(50000)),
+				MaxPriorityFeePerGas: (*hexutil.Big)(big.NewInt(1000000)),
+				MaxFeePerGas:         (*hexutil.Big)(big.NewInt(2000000)),
+				Paymaster:            nil,
+				PaymasterData:        hexutil.Bytes{},
+				Signature:            hexutil.MustDecode("0x5678"),
 			},
 			chainId: big.NewInt(42161), // Arbitrum One
 			wantErr: false,
 		},
 		{
 			name: "large nonce value",
-			packedOp: &PackedUserOp{
-				Sender:             common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:              "0x1234567890abcdef",
-				InitCode:           hexutil.Bytes{},
-				CallData:           hexutil.MustDecode("0x1234"),
-				AccountGasLimits:   make([]byte, 32),
-				PreVerificationGas: make([]byte, 32),
-				GasFees:            make([]byte, 32),
-				PaymasterAndData:   hexutil.Bytes{},
-				Signature:          hexutil.MustDecode("0x5678"),
-			},
-			chainId: big.NewInt(1),
-			wantErr: false,
-		},
-		{
-			name: "invalid nonce format",
-			packedOp: &PackedUserOp{
-				Sender:             common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:              "invalid",
-				InitCode:           hexutil.Bytes{},
-				CallData:           hexutil.MustDecode("0x1234"),
-				AccountGasLimits:   make([]byte, 32),
-				PreVerificationGas: make([]byte, 32),
-				GasFees:            make([]byte, 32),
-				PaymasterAndData:   hexutil.Bytes{},
-				Signature:          hexutil.MustDecode("0x5678"),
-			},
-			chainId:     big.NewInt(1),
-			wantErr:     true,
-			errContains: "invalid nonce format",
-		},
-		{
-			name: "nonce without 0x prefix",
-			packedOp: &PackedUserOp{
-				Sender:             common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:              "123",
-				InitCode:           hexutil.Bytes{},
-				CallData:           hexutil.MustDecode("0x1234"),
-				AccountGasLimits:   make([]byte, 32),
-				PreVerificationGas: make([]byte, 32),
-				GasFees:            make([]byte, 32),
-				PaymasterAndData:   hexutil.Bytes{},
-				Signature:          hexutil.MustDecode("0x5678"),
-			},
-			chainId: big.NewInt(1),
-			wantErr: false,
-		},
-		{
-			name: "empty nonce",
-			packedOp: &PackedUserOp{
-				Sender:             common.HexToAddress("0x1234567890123456789012345678901234567890"),
-				Nonce:              "",
-				InitCode:           hexutil.Bytes{},
-				CallData:           hexutil.MustDecode("0x1234"),
-				AccountGasLimits:   make([]byte, 32),
-				PreVerificationGas: make([]byte, 32),
-				GasFees:            make([]byte, 32),
-				PaymasterAndData:   hexutil.Bytes{},
-				Signature:          hexutil.MustDecode("0x5678"),
+			userOp: &UserOperation{
+				Sender:               common.HexToAddress("0x1234567890123456789012345678901234567890"),
+				Nonce:                (*hexutil.Big)(new(big.Int).SetBytes(common.Hex2Bytes("1234567890abcdef"))),
+				Factory:              nil,
+				FactoryData:          hexutil.Bytes{},
+				CallData:             hexutil.MustDecode("0x1234"),
+				CallGasLimit:         (*hexutil.Big)(big.NewInt(100000)),
+				VerificationGasLimit: (*hexutil.Big)(big.NewInt(200000)),
+				PreVerificationGas:   (*hexutil.Big)(big.NewInt(50000)),
+				MaxPriorityFeePerGas: (*hexutil.Big)(big.NewInt(1000000)),
+				MaxFeePerGas:         (*hexutil.Big)(big.NewInt(2000000)),
+				Paymaster:            nil,
+				PaymasterData:        hexutil.Bytes{},
+				Signature:            hexutil.MustDecode("0x5678"),
 			},
 			chainId: big.NewInt(1),
 			wantErr: false,
@@ -750,7 +663,7 @@ func TestGetUserOpHashV07(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hash, err := getUserOpHashV07(tt.packedOp, tt.chainId)
+			hash, err := tt.userOp.GetUserOpHashV07(tt.chainId)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -771,23 +684,27 @@ func TestGetUserOpHashV07(t *testing.T) {
 
 func TestGetUserOpHashV07_Consistency(t *testing.T) {
 	// Test that the same input produces the same hash
-	packedOp := &PackedUserOp{
-		Sender:             common.HexToAddress("0x1234567890123456789012345678901234567890"),
-		Nonce:              "0x1",
-		InitCode:           hexutil.Bytes{},
-		CallData:           hexutil.MustDecode("0x1234"),
-		AccountGasLimits:   make([]byte, 32),
-		PreVerificationGas: make([]byte, 32),
-		GasFees:            make([]byte, 32),
-		PaymasterAndData:   hexutil.Bytes{},
-		Signature:          hexutil.MustDecode("0x5678"),
+	userOp := &UserOperation{
+		Sender:               common.HexToAddress("0x1234567890123456789012345678901234567890"),
+		Nonce:                (*hexutil.Big)(big.NewInt(1)),
+		Factory:              nil,
+		FactoryData:          hexutil.Bytes{},
+		CallData:             hexutil.MustDecode("0x1234"),
+		CallGasLimit:         (*hexutil.Big)(big.NewInt(100000)),
+		VerificationGasLimit: (*hexutil.Big)(big.NewInt(200000)),
+		PreVerificationGas:   (*hexutil.Big)(big.NewInt(50000)),
+		MaxPriorityFeePerGas: (*hexutil.Big)(big.NewInt(1000000)),
+		MaxFeePerGas:         (*hexutil.Big)(big.NewInt(2000000)),
+		Paymaster:            nil,
+		PaymasterData:        hexutil.Bytes{},
+		Signature:            hexutil.MustDecode("0x5678"),
 	}
 	chainId := big.NewInt(1)
 
-	hash1, err1 := getUserOpHashV07(packedOp, chainId)
+	hash1, err1 := userOp.GetUserOpHashV07(chainId)
 	require.NoError(t, err1)
 
-	hash2, err2 := getUserOpHashV07(packedOp, chainId)
+	hash2, err2 := userOp.GetUserOpHashV07(chainId)
 	require.NoError(t, err2)
 
 	assert.Equal(t, hash1, hash2, "Same input should produce same hash")
@@ -795,45 +712,49 @@ func TestGetUserOpHashV07_Consistency(t *testing.T) {
 
 func TestGetUserOpHashV07_DifferentInputs(t *testing.T) {
 	// Test that different inputs produce different hashes
-	baseOp := &PackedUserOp{
-		Sender:             common.HexToAddress("0x1234567890123456789012345678901234567890"),
-		Nonce:              "0x1",
-		InitCode:           hexutil.Bytes{},
-		CallData:           hexutil.MustDecode("0x1234"),
-		AccountGasLimits:   make([]byte, 32),
-		PreVerificationGas: make([]byte, 32),
-		GasFees:            make([]byte, 32),
-		PaymasterAndData:   hexutil.Bytes{},
-		Signature:          hexutil.MustDecode("0x5678"),
+	baseOp := &UserOperation{
+		Sender:               common.HexToAddress("0x1234567890123456789012345678901234567890"),
+		Nonce:                (*hexutil.Big)(big.NewInt(1)),
+		Factory:              nil,
+		FactoryData:          hexutil.Bytes{},
+		CallData:             hexutil.MustDecode("0x1234"),
+		CallGasLimit:         (*hexutil.Big)(big.NewInt(100000)),
+		VerificationGasLimit: (*hexutil.Big)(big.NewInt(200000)),
+		PreVerificationGas:   (*hexutil.Big)(big.NewInt(50000)),
+		MaxPriorityFeePerGas: (*hexutil.Big)(big.NewInt(1000000)),
+		MaxFeePerGas:         (*hexutil.Big)(big.NewInt(2000000)),
+		Paymaster:            nil,
+		PaymasterData:        hexutil.Bytes{},
+		Signature:            hexutil.MustDecode("0x5678"),
 	}
 	chainId := big.NewInt(1)
 
-	baseHash, err := getUserOpHashV07(baseOp, chainId)
+	baseHash, err := baseOp.GetUserOpHashV07(chainId)
 	require.NoError(t, err)
 
 	// Test different sender
 	diffSenderOp := *baseOp
 	diffSenderOp.Sender = common.HexToAddress("0x9876543210987654321098765432109876543210")
-	diffSenderHash, err := getUserOpHashV07(&diffSenderOp, chainId)
+	diffSenderHash, err := diffSenderOp.GetUserOpHashV07(chainId)
 	require.NoError(t, err)
 	assert.NotEqual(t, baseHash, diffSenderHash, "Different sender should produce different hash")
 
 	// Test different nonce
 	diffNonceOp := *baseOp
-	diffNonceOp.Nonce = "0x2"
-	diffNonceHash, err := getUserOpHashV07(&diffNonceOp, chainId)
+	diffNonceOp.Nonce = (*hexutil.Big)(big.NewInt(2))
+	diffNonceHash, err := diffNonceOp.GetUserOpHashV07(chainId)
 	require.NoError(t, err)
 	assert.NotEqual(t, baseHash, diffNonceHash, "Different nonce should produce different hash")
 
 	// Test different chain ID
-	diffChainHash, err := getUserOpHashV07(baseOp, big.NewInt(137))
+	diffChainHash, err := baseOp.GetUserOpHashV07(big.NewInt(137))
 	require.NoError(t, err)
 	assert.NotEqual(t, baseHash, diffChainHash, "Different chain ID should produce different hash")
 
 	// Test different call data
 	diffCallDataOp := *baseOp
 	diffCallDataOp.CallData = hexutil.MustDecode("0x9876")
-	diffCallDataHash, err := getUserOpHashV07(&diffCallDataOp, chainId)
+	diffCallDataHash, err := diffCallDataOp.GetUserOpHashV07(chainId)
 	require.NoError(t, err)
 	assert.NotEqual(t, baseHash, diffCallDataHash, "Different call data should produce different hash")
 }
