@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/ethaccount/backend/src/domain"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/rs/zerolog"
 )
@@ -54,25 +53,10 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job *domain.Job) (str
 	}
 
 	// Create user operation hash for signing
-	userOpHash, err := s.createUserOperationHash(userOp, job.EntryPointAddress, job.ChainID)
-	if err != nil {
-		s.logger(ctx).Error().Err(err).
-			Str("job_id", job.ID.String()).
-			Msg("failed to create user operation hash")
-		return "", fmt.Errorf("failed to create user operation hash: %w", err)
-	}
 
 	// Sign the user operation hash
-	signature, err := crypto.Sign(userOpHash, s.privateKey)
-	if err != nil {
-		s.logger(ctx).Error().Err(err).
-			Str("job_id", job.ID.String()).
-			Msg("failed to sign user operation")
-		return "", fmt.Errorf("failed to sign user operation: %w", err)
-	}
 
 	// Append signature to user operation
-	userOp.Signature = "0x" + common.Bytes2Hex(signature)
 
 	s.logger(ctx).Debug().
 		Str("job_id", job.ID.String()).
@@ -94,10 +78,4 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job *domain.Job) (str
 		Msg("job executed successfully")
 
 	return userOpHashString, nil
-}
-
-// createUserOperationHash creates the hash that needs to be signed for the user operation
-// This follows the ERC-4337 specification for user operation hashing
-func (s *ExecutionService) createUserOperationHash(userOp *domain.UserOperation, entryPoint string, chainId int64) ([]byte, error) {
-	return GetUserOpHash(userOp, entryPoint, chainId)
 }
