@@ -12,7 +12,7 @@ import (
 // @Produce json
 // @Success 200 {object} StandardResponse
 // @Router /health [get]
-func handleHealthCheck(c *gin.Context) {
+func HandleHealthCheck(c *gin.Context) {
 	data := map[string]string{"status": "healthy"}
 	respondWithSuccess(c, data, "OK")
 }

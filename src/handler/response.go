@@ -80,7 +80,7 @@ func respondWithError(c *gin.Context, err error) {
 
 	ctx := c.Request.Context()
 	zerolog.Ctx(ctx).Error().
-		Str("func", "respondWithError").
+		Str("function", "respondWithError").
 		Int("error_code", response.Code).
 		Msg(response.Message)
 
@@ -98,7 +98,7 @@ func respondWithCustomError(c *gin.Context, httpStatus int, code int, message st
 
 	ctx := c.Request.Context()
 	zerolog.Ctx(ctx).Error().
-		Str("func", "respondWithCustomError").
+		Str("function", "respondWithCustomError").
 		Int("error_code", code).
 		Msg(message)
 

@@ -23,6 +23,14 @@ const (
 	scheduledTransfersAddress = "0xA8E374779aeE60413c974b484d6509c7E4DDb6bA"
 )
 
+type BlockchainConfig struct {
+	SepoliaRPCURL         string
+	ArbitrumSepoliaRPCURL string
+	BaseSepoliaRPCURL     string
+	OptimismSepoliaRPCURL string
+	PolygonAmoyRPCURL     string
+}
+
 type BlockchainService struct {
 	SepoliaRPCURL         *string
 	ArbitrumSepoliaRPCURL *string
@@ -31,13 +39,13 @@ type BlockchainService struct {
 	PolygonAmoyRPCURL     *string
 }
 
-func NewBlockchainService(config AppConfig) *BlockchainService {
+func NewBlockchainService(config BlockchainConfig) *BlockchainService {
 	return &BlockchainService{
-		SepoliaRPCURL:         config.SepoliaRPCURL,
-		ArbitrumSepoliaRPCURL: config.ArbitrumSepoliaRPCURL,
-		BaseSepoliaRPCURL:     config.BaseSepoliaRPCURL,
-		OptimismSepoliaRPCURL: config.OptimismSepoliaRPCURL,
-		PolygonAmoyRPCURL:     config.PolygonAmoyRPCURL,
+		SepoliaRPCURL:         &config.SepoliaRPCURL,
+		ArbitrumSepoliaRPCURL: &config.ArbitrumSepoliaRPCURL,
+		BaseSepoliaRPCURL:     &config.BaseSepoliaRPCURL,
+		OptimismSepoliaRPCURL: &config.OptimismSepoliaRPCURL,
+		PolygonAmoyRPCURL:     &config.PolygonAmoyRPCURL,
 	}
 }
 

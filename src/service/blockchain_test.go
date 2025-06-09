@@ -19,12 +19,12 @@ func getBlockchainService() *BlockchainService {
 	optimismSepoliaRpcUrl := testutil.GetEnv("OPTIMISM_SEPOLIA_RPC_URL")
 	polygonAmoyRpcUrl := testutil.GetEnv("POLYGON_AMOY_RPC_URL")
 
-	blockchainService := NewBlockchainService(AppConfig{
-		SepoliaRPCURL:         &sepoliaRpcUrl,
-		ArbitrumSepoliaRPCURL: &arbitrumSepoliaRpcUrl,
-		BaseSepoliaRPCURL:     &baseSepoliaRpcUrl,
-		OptimismSepoliaRPCURL: &optimismSepoliaRpcUrl,
-		PolygonAmoyRPCURL:     &polygonAmoyRpcUrl,
+	blockchainService := NewBlockchainService(BlockchainConfig{
+		SepoliaRPCURL:         sepoliaRpcUrl,
+		ArbitrumSepoliaRPCURL: arbitrumSepoliaRpcUrl,
+		BaseSepoliaRPCURL:     baseSepoliaRpcUrl,
+		OptimismSepoliaRPCURL: optimismSepoliaRpcUrl,
+		PolygonAmoyRPCURL:     polygonAmoyRpcUrl,
 	})
 
 	return blockchainService

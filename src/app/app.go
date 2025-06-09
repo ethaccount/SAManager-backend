@@ -1,0 +1,233 @@
+package app
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"reflect"
+	"sync"
+	"time"
+
+	"github.com/ethaccount/backend/src/handler"
+	"github.com/ethaccount/backend/src/repository"
+	"github.com/ethaccount/backend/src/service"
+	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
+	"github.com/go-redis/redis/v8"
+	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/shopspring/decimal"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	"github.com/rs/zerolog"
+	postgresDriver "gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+type Application struct {
+	config         AppConfig
+	database       *gorm.DB
+	redis          *redis.Client
+	PasskeyService *service.PasskeyService
+	JobService     *service.JobService
+}
+
+func NewApplication(ctx context.Context, config AppConfig) *Application {
+	logger := zerolog.Ctx(ctx).With().Str("function", "NewApplication").Logger()
+
+	// Connect to Redis
+	redisOpts, err := redis.ParseURL(*config.RedisAddr)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to parse redis URL")
+		return nil
+	}
+
+	rdb := redis.NewClient(redisOpts)
+
+	// Test Redis connection
+	if err := rdb.Ping(ctx).Err(); err != nil {
+		logger.Error().Err(err).Msg("connection to redis failed")
+		return nil
+	}
+
+	// Connect to database
+	database, err := gorm.Open(postgresDriver.Open(*config.DSN), &gorm.Config{})
+	if err != nil {
+		logger.Error().Err(err).Msg("connection to database failed")
+		return nil
+	}
+
+	// run migration files
+	migrationPath := "file://migrations"
+
+	MigrationUp(*config.DSN, migrationPath)
+
+	// Passkey Service
+	passkeyRepo := repository.NewPasskeyRepository(database)
+
+	webAuthnConfig := &webauthn.Config{
+		RPDisplayName: "Passkey Demo",
+		RPID:          "localhost",
+		RPOrigins:     []string{"http://localhost:" + *config.Port},
+	}
+
+	passkeyService, err := service.NewPasskeyService(ctx, passkeyRepo, webAuthnConfig, 5*time.Minute)
+	if err != nil {
+		logger.Error().Err(err).Msg("creation of passkey service failed")
+		return nil
+	}
+
+	// Job Service
+	jobRepo := repository.NewJobRepository(database)
+	jobService := service.NewJobService(jobRepo)
+
+	// Blockchain Service
+	// blockchainService := service.NewBlockchainService(service.BlockchainConfig{
+	// 	SepoliaRPCURL:         *config.SepoliaRPCURL,
+	// 	ArbitrumSepoliaRPCURL: *config.ArbitrumSepoliaRPCURL,
+	// 	BaseSepoliaRPCURL:     *config.BaseSepoliaRPCURL,
+	// 	OptimismSepoliaRPCURL: *config.OptimismSepoliaRPCURL,
+	// 	PolygonAmoyRPCURL:     *config.PolygonAmoyRPCURL,
+	// })
+
+	// // Polling Service
+	// pollingService := service.NewPollingService(jobService, blockchainService, service.PollingConfig{
+	// 	PollingInterval: 10 * time.Second,
+	// })
+
+	// go pollingService.Start(ctx)
+
+	// // Execution Service
+	// executionService, err := service.NewExecutionService(blockchainService, *config.PrivateKey)
+	// if err != nil {
+	// 	log.Fatalf("failed to create execution service: %v", err)
+	// }
+
+	return &Application{
+		config:         config,
+		database:       database,
+		redis:          rdb,
+		PasskeyService: passkeyService,
+		JobService:     jobService,
+	}
+}
+
+func (app *Application) RunHTTPServer(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	logger := zerolog.Ctx(ctx).With().Str("function", "RunHTTP").Logger()
+
+	// Set to release mode to disable Gin logger
+	gin.SetMode(gin.ReleaseMode)
+
+	ginRouter := gin.Default()
+
+	// Register routes
+	app.registerRoutes(ctx, ginRouter)
+
+	// Build HTTP server
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%s", *app.config.Port),
+		Handler: ginRouter,
+	}
+
+	// Start server in goroutine
+	go func() {
+		zerolog.Ctx(ctx).Info().Msgf("HTTP server is on http://localhost:%s", *app.config.Port)
+		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			zerolog.Ctx(ctx).Panic().Err(err).Msg("Failed to start HTTP server")
+		}
+	}()
+
+	// Wait for context cancellation
+	<-ctx.Done()
+
+	logger.Info().Msg("Gracefully shutting down HTTP server...")
+
+	// Create shutdown context with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	// Shutdown server
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error().Err(err).Msg("Failed to shutdown HTTP server gracefully")
+	} else {
+		logger.Info().Msg("HTTP server shutdown complete")
+	}
+
+	// Close database connection
+	db, err := app.database.DB()
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to get underlying database connection")
+		return
+	}
+
+	if err := db.Close(); err != nil {
+		logger.Error().Err(err).Msg("Failed to close database connection")
+	} else {
+		logger.Info().Msg("Database connection closed")
+	}
+}
+
+func (app *Application) RunPollingWorker(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	logger := zerolog.Ctx(ctx).With().Str("function", "RunPollingServer").Logger()
+	logger.Info().Msg("Starting polling worker")
+
+	ticker := time.NewTicker(time.Duration(*app.config.PollingInterval) * time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info().Msg("Gracefully shutting down polling worker...")
+			ticker.Stop()
+
+			// Close Redis connection
+			if err := app.redis.Close(); err != nil {
+				logger.Error().Err(err).Msg("Failed to close redis connection")
+			} else {
+				logger.Info().Msg("Redis connection closed")
+			}
+			return
+
+		case <-ticker.C:
+			logger.Info().Msg("Polling...")
+			// app.Scheduler.poll(ctx)
+		}
+	}
+}
+
+func (app *Application) registerRoutes(ctx context.Context, router *gin.Engine) {
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterCustomTypeFunc(func(field reflect.Value) interface{} {
+			if value, ok := field.Interface().(decimal.Decimal); ok {
+				return value.String()
+			}
+			return nil
+		}, decimal.Decimal{})
+	}
+
+	handler.SetMiddlewares(ctx, router)
+
+	// Swagger documentation
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	passkeyHandler := handler.NewPasskeyHandler(app.PasskeyService)
+	jobHandler := handler.NewJobHandler(app.JobService)
+
+	v1 := router.Group("/api/v1")
+	{
+		v1.GET("/health", handler.HandleHealthCheck)
+		v1.POST("/register/begin", passkeyHandler.RegisterBegin())
+		// v1.POST("/register/verify", passkeyHandler.RegisterVerify)
+		// v1.POST("/login/options", passkeyHandler.LoginOptions)
+		// v1.POST("/login/verify", passkeyHandler.LoginVerify)
+
+		// Job management endpoints
+		v1.POST("/jobs", jobHandler.RegisterJob)
+	}
+}

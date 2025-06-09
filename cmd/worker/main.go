@@ -17,64 +17,14 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// WorkerManager manages the lifecycle of individual workers
-type WorkerManager struct {
-	name    string
-	ctx     context.Context
-	cancel  context.CancelFunc
-	wg      *sync.WaitGroup
-	logger  zerolog.Logger
-	running bool
-	mu      sync.RWMutex
-}
-
-func NewWorkerManager(name string, parentCtx context.Context, logger zerolog.Logger) *WorkerManager {
-	ctx, cancel := context.WithCancel(parentCtx)
-	return &WorkerManager{
-		name:   name,
-		ctx:    ctx,
-		cancel: cancel,
-		wg:     &sync.WaitGroup{},
-		logger: logger.With().Str("worker", name).Logger(),
-	}
-}
-
-func (sm *WorkerManager) Start() {
-	sm.mu.Lock()
-	sm.running = true
-	sm.mu.Unlock()
-}
-
-func (sm *WorkerManager) Stop() {
-	sm.mu.Lock()
-	if sm.running {
-		sm.logger.Info().Msg("Stopping worker...")
-		sm.cancel()
-		sm.running = false
-	}
-	sm.mu.Unlock()
-}
-
-func (sm *WorkerManager) IsRunning() bool {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
-	return sm.running
-}
-
-func (sm *WorkerManager) Wait() {
-	sm.wg.Wait()
-}
-
 // HTTPWorker represents the HTTP server worker
 type HTTPWorker struct {
-	*WorkerManager
 	server *http.Server
 	db     *sql.DB
 	port   int
 }
 
-func NewHTTPWorker(parentCtx context.Context, logger zerolog.Logger, port int, dbDSN string) (*HTTPWorker, error) {
-	sm := NewWorkerManager("http", parentCtx, logger)
+func NewHTTPWorker(ctx context.Context, port int, dbDSN string) (*HTTPWorker, error) {
 
 	// Connect to Postgres
 	db, err := sql.Open("postgres", dbDSN)
@@ -103,205 +53,113 @@ func NewHTTPWorker(parentCtx context.Context, logger zerolog.Logger, port int, d
 	}
 
 	return &HTTPWorker{
-		WorkerManager: sm,
-		server:        server,
-		db:            db,
-		port:          port,
+		server: server,
+		db:     db,
+		port:   port,
 	}, nil
 }
 
-func (hs *HTTPWorker) Run() {
-	hs.wg.Add(1)
-	defer hs.wg.Done()
+func (hw *HTTPWorker) Run(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-	hs.Start()
-	hs.logger.Info().Int("port", hs.port).Msg("Starting HTTP server")
+	logger := zerolog.Ctx(ctx).With().Str("worker", "http").Logger()
+	logger.Info().Int("port", hw.port).Msg("Starting HTTP worker")
 
 	// Start server in goroutine
 	go func() {
-		if err := hs.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			hs.logger.Error().Err(err).Msg("HTTP server error")
+		if err := hw.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error().Err(err).Msg("HTTP server error")
 		}
 	}()
 
 	// Wait for context cancellation
-	<-hs.ctx.Done()
+	<-ctx.Done()
 
-	hs.logger.Info().Msg("Gracefully shutting down HTTP server...")
+	logger.Info().Msg("Gracefully shutting down HTTP worker...")
 
 	// Create shutdown context with timeout
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
 	// Shutdown server
-	if err := hs.server.Shutdown(shutdownCtx); err != nil {
-		hs.logger.Error().Err(err).Msg("Failed to shutdown HTTP server gracefully")
+	if err := hw.server.Shutdown(shutdownCtx); err != nil {
+		logger.Error().Err(err).Msg("Failed to shutdown HTTP server gracefully")
 	} else {
-		hs.logger.Info().Msg("HTTP server shutdown complete")
+		logger.Info().Msg("HTTP server shutdown complete")
 	}
 
 	// Close database connection
-	if err := hs.db.Close(); err != nil {
-		hs.logger.Error().Err(err).Msg("Failed to close database connection")
+	if err := hw.db.Close(); err != nil {
+		logger.Error().Err(err).Msg("Failed to close database connection")
 	} else {
-		hs.logger.Info().Msg("Database connection closed")
+		logger.Info().Msg("Database connection closed")
 	}
 }
 
 // PollingWorker represents the polling worker
 type PollingWorker struct {
-	*WorkerManager
 	redis  *redis.Client
 	ticker *time.Ticker
 }
 
-func NewPollingWorker(parentCtx context.Context, logger zerolog.Logger, redisAddr string) (*PollingWorker, error) {
-	sm := NewWorkerManager("polling", parentCtx, logger)
-
+func NewPollingWorker(ctx context.Context, redisAddr string) (*PollingWorker, error) {
 	// Connect to Redis
 	rdb := redis.NewClient(&redis.Options{
 		Addr: redisAddr,
 	})
 
 	// Test connection
-	if err := rdb.Ping(parentCtx).Err(); err != nil {
+	if err := rdb.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("failed to connect to redis: %w", err)
 	}
 
 	return &PollingWorker{
-		WorkerManager: sm,
-		redis:         rdb,
-		ticker:        time.NewTicker(5 * time.Second),
+		redis:  rdb,
+		ticker: time.NewTicker(5 * time.Second),
 	}, nil
 }
 
-func (ps *PollingWorker) Run() {
-	ps.wg.Add(1)
-	defer ps.wg.Done()
+func (pw *PollingWorker) Run(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-	ps.Start()
-	ps.logger.Info().Msg("Starting polling worker")
+	logger := zerolog.Ctx(ctx).With().Str("worker", "polling").Logger()
+	logger.Info().Msg("Starting polling worker")
 
 	for {
 		select {
-		case <-ps.ctx.Done():
-			ps.logger.Info().Msg("Gracefully shutting down polling worker...")
-			ps.ticker.Stop()
+		case <-ctx.Done():
+			logger.Info().Msg("Gracefully shutting down polling worker...")
+			pw.ticker.Stop()
 
 			// Close Redis connection
-			if err := ps.redis.Close(); err != nil {
-				ps.logger.Error().Err(err).Msg("Failed to close redis connection")
+			if err := pw.redis.Close(); err != nil {
+				logger.Error().Err(err).Msg("Failed to close redis connection")
 			} else {
-				ps.logger.Info().Msg("Redis connection closed")
+				logger.Info().Msg("Redis connection closed")
 			}
 			return
 
-		case <-ps.ticker.C:
-			ps.poll()
+		case <-pw.ticker.C:
+			pw.poll(ctx)
 		}
 	}
 }
 
-func (ps *PollingWorker) poll() {
+func (pw *PollingWorker) poll(ctx context.Context) {
+	logger := zerolog.Ctx(ctx).With().Str("worker", "polling").Logger()
+
 	// Simulate polling work
-	ctx, cancel := context.WithTimeout(ps.ctx, 3*time.Second)
+	pollCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
 	// Example: Set a value in Redis
-	err := ps.redis.Set(ctx, "last_poll", time.Now().Unix(), time.Minute).Err()
+	err := pw.redis.Set(pollCtx, "last_poll", time.Now().Unix(), time.Minute).Err()
 	if err != nil {
-		ps.logger.Error().Err(err).Msg("Failed to update poll timestamp")
+		logger.Error().Err(err).Msg("Failed to update poll timestamp")
 		return
 	}
 
-	ps.logger.Debug().Msg("Polling completed successfully")
-}
-
-// WorkerController manages multiple workers and handles shutdown commands
-type WorkerController struct {
-	workers map[string]Worker
-	logger  zerolog.Logger
-	mu      sync.RWMutex
-}
-
-type Worker interface {
-	Run()
-	Stop()
-	IsRunning() bool
-	Wait()
-}
-
-func NewWorkerController(logger zerolog.Logger) *WorkerController {
-	return &WorkerController{
-		workers: make(map[string]Worker),
-		logger:  logger,
-	}
-}
-
-func (sc *WorkerController) AddWorker(name string, worker Worker) {
-	sc.mu.Lock()
-	defer sc.mu.Unlock()
-	sc.workers[name] = worker
-}
-
-func (sc *WorkerController) StartAll() {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-
-	for name, worker := range sc.workers {
-		go func(name string, svc Worker) {
-			sc.logger.Info().Str("worker", name).Msg("Starting worker")
-			svc.Run()
-			sc.logger.Info().Str("worker", name).Msg("Worker stopped")
-		}(name, worker)
-	}
-}
-
-func (sc *WorkerController) StopWorker(name string) bool {
-	sc.mu.RLock()
-	worker, exists := sc.workers[name]
-	sc.mu.RUnlock()
-
-	if !exists {
-		sc.logger.Warn().Str("worker", name).Msg("Worker not found")
-		return false
-	}
-
-	worker.Stop()
-	sc.logger.Info().Str("worker", name).Msg("Stop signal sent to worker")
-	return true
-}
-
-func (sc *WorkerController) StopAll() {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-
-	for name, worker := range sc.workers {
-		sc.logger.Info().Str("worker", name).Msg("Stopping worker")
-		worker.Stop()
-	}
-}
-
-func (sc *WorkerController) WaitAll() {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-
-	for name, worker := range sc.workers {
-		sc.logger.Info().Str("worker", name).Msg("Waiting for worker to stop")
-		worker.Wait()
-	}
-}
-
-func (sc *WorkerController) IsAnyRunning() bool {
-	sc.mu.RLock()
-	defer sc.mu.RUnlock()
-
-	for _, worker := range sc.workers {
-		if worker.IsRunning() {
-			return true
-		}
-	}
-	return false
+	logger.Debug().Msg("Polling completed successfully")
 }
 
 // Configuration struct
@@ -353,79 +211,44 @@ func main() {
 		Int("port", cfg.Port).
 		Msg("Starting application")
 
-	// Create root context
+	// Create root context with logger
 	rootCtx, rootCancel := context.WithCancel(context.Background())
+	rootCtx = logger.WithContext(rootCtx)
+	wg := sync.WaitGroup{}
 
-	// Initialize worker controller
-	controller := NewWorkerController(logger)
-
-	// Create and add HTTP worker
-	httpWorker, err := NewHTTPWorker(rootCtx, logger, cfg.Port, cfg.DBConnStr)
+	// Create and start HTTP worker
+	httpWorker, err := NewHTTPWorker(rootCtx, cfg.Port, cfg.DBConnStr)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to create HTTP worker")
 	}
-	controller.AddWorker("http", httpWorker)
 
-	// Create and add polling worker
-	pollingWorker, err := NewPollingWorker(rootCtx, logger, cfg.RedisAddr)
+	wg.Add(1)
+	go httpWorker.Run(rootCtx, &wg)
+
+	// Create and start polling worker
+	pollingWorker, err := NewPollingWorker(rootCtx, cfg.RedisAddr)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Failed to create polling worker")
 	}
-	controller.AddWorker("polling", pollingWorker)
 
-	// Start all workers
-	controller.StartAll()
+	wg.Add(1)
+	go pollingWorker.Run(rootCtx, &wg)
 
-	// Setup signal handling
+	// Setup signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	// Setup command channel for individual worker control
-	// In a real application, this could be a HTTP endpoint, gRPC worker, or Unix socket
-	commandChan := make(chan string, 1)
+	// Wait for shutdown signal
+	sig := <-sigChan
+	logger.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
 
-	// Example: Simulate receiving commands (in real app, this would come from external source)
-	go func() {
-		// Uncomment and modify these lines to test individual worker stopping:
-		// time.Sleep(15 * time.Second)
-		// commandChan <- "stop:http"    // Stop only HTTP worker
-		// time.Sleep(5 * time.Second)
-		// commandChan <- "stop:polling" // Stop only polling worker
-	}()
-
-	// Main event loop
-	for {
-		select {
-		case sig := <-sigChan:
-			logger.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
-			controller.StopAll()
-			rootCancel()
-
-		case cmd := <-commandChan:
-			logger.Info().Str("command", cmd).Msg("Received command")
-			if cmd == "stop:http" {
-				controller.StopWorker("http")
-			} else if cmd == "stop:polling" {
-				controller.StopWorker("polling")
-			} else if cmd == "stop:all" {
-				controller.StopAll()
-				rootCancel()
-			} else {
-				logger.Warn().Str("command", cmd).Msg("Unknown command")
-			}
-		}
-
-		// Check if all workers have stopped
-		if !controller.IsAnyRunning() {
-			logger.Info().Msg("All workers stopped, shutting down")
-			break
-		}
-	}
+	// Cancel root context to signal all workers to stop
+	rootCancel()
 
 	// Wait for all workers to complete with timeout
 	waitChan := make(chan struct{})
 	go func() {
-		controller.WaitAll()
+		wg.Wait()
 		close(waitChan)
 	}()
 

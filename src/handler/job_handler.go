@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethaccount/backend/src/domain"
 	"github.com/ethaccount/backend/src/service"
+
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 )
@@ -57,7 +58,7 @@ type RegisterJobResponse struct {
 // @Failure 500 {object} StandardResponse
 // @Router /jobs [post]
 func (h *JobHandler) RegisterJob(c *gin.Context) {
-	logger := h.logger(c.Request.Context()).With().Str("func", "RegisterJob").Logger()
+	logger := h.logger(c.Request.Context()).With().Str("function", "RegisterJob").Logger()
 
 	var req RegisterJobRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
