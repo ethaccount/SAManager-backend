@@ -1,9 +1,9 @@
 .PHONY: run # .PHONY is to make always executes the commands regardless of whether a file named "run" exists.
 run:
-	go run cmd/server/main.go
+	go run cmd/samanager/main.go
 
 build:
-	go build -o bin/server cmd/server/main.go
+	go build -o bin/samanager cmd/samanager/main.go
 
 .PHONY: migrate
 migrate:
