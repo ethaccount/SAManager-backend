@@ -121,6 +121,9 @@ func main() {
 	// Cancel root context to signal all workers to stop
 	rootCancel()
 
+	// Shutdown application repositories
+	app.Shutdown(rootCtx)
+
 	// Wait for all workers to complete with timeout
 	waitChan := make(chan struct{})
 	go func() {

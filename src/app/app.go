@@ -113,6 +113,33 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 	}
 }
 
+func (app *Application) Shutdown(ctx context.Context) {
+	logger := zerolog.Ctx(ctx).With().Str("function", "Shutdown").Logger()
+
+	// Close database connection
+	if app.database != nil {
+		db, err := app.database.DB()
+		if err != nil {
+			logger.Error().Err(err).Msg("Failed to get underlying database connection")
+		} else {
+			if err := db.Close(); err != nil {
+				logger.Error().Err(err).Msg("Failed to close database connection")
+			} else {
+				logger.Info().Msg("Database connection closed")
+			}
+		}
+	}
+
+	// Close Redis connection
+	if app.redis != nil {
+		if err := app.redis.Close(); err != nil {
+			logger.Error().Err(err).Msg("Failed to close redis connection")
+		} else {
+			logger.Info().Msg("Redis connection closed")
+		}
+	}
+}
+
 func (app *Application) RunHTTPServer(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
@@ -134,7 +161,7 @@ func (app *Application) RunHTTPServer(ctx context.Context, wg *sync.WaitGroup) {
 
 	// Start server in goroutine
 	go func() {
-		zerolog.Ctx(ctx).Info().Msgf("HTTP server is on http://localhost:%s", *app.config.Port)
+		zerolog.Ctx(ctx).Info().Msgf("HTTP server is on http://localhost:%s/api/v1/health", *app.config.Port)
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			zerolog.Ctx(ctx).Panic().Err(err).Msg("Failed to start HTTP server")
@@ -156,19 +183,6 @@ func (app *Application) RunHTTPServer(ctx context.Context, wg *sync.WaitGroup) {
 	} else {
 		logger.Info().Msg("HTTP server shutdown complete")
 	}
-
-	// Close database connection
-	db, err := app.database.DB()
-	if err != nil {
-		logger.Error().Err(err).Msg("Failed to get underlying database connection")
-		return
-	}
-
-	if err := db.Close(); err != nil {
-		logger.Error().Err(err).Msg("Failed to close database connection")
-	} else {
-		logger.Info().Msg("Database connection closed")
-	}
 }
 
 func (app *Application) RunPollingWorker(ctx context.Context, wg *sync.WaitGroup) {
@@ -184,13 +198,6 @@ func (app *Application) RunPollingWorker(ctx context.Context, wg *sync.WaitGroup
 		case <-ctx.Done():
 			logger.Info().Msg("Gracefully shutting down polling worker...")
 			ticker.Stop()
-
-			// Close Redis connection
-			if err := app.redis.Close(); err != nil {
-				logger.Error().Err(err).Msg("Failed to close redis connection")
-			} else {
-				logger.Info().Msg("Redis connection closed")
-			}
 			return
 
 		case <-ticker.C:
