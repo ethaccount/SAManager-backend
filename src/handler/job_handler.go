@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 )
+
+const TimeFormat = "2006-01-02 15:04:05"
 
 type JobHandler struct {
 	jobService *service.JobService
@@ -43,7 +46,35 @@ type RegisterJobResponse struct {
 	ChainID        int64  `json:"chainId" example:"11155111"`
 	JobID          int64  `json:"jobId" example:"1"`
 	EntryPoint     string `json:"entryPoint" example:"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"`
+	CreatedAt      string `json:"createdAt" example:"2025-01-09 13:36:56"`
+	UpdatedAt      string `json:"updatedAt" example:"2025-01-09 13:36:56"`
 	Message        string `json:"message" example:"Job registered successfully"`
+}
+
+// JobResponse represents a job in API responses
+type JobResponse struct {
+	ID                string          `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	AccountAddress    string          `json:"accountAddress" example:"0x1234567890123456789012345678901234567890"`
+	ChainID           int64           `json:"chainId" example:"11155111"`
+	OnChainJobID      int64           `json:"onChainJobId" example:"1"`
+	UserOperation     json.RawMessage `json:"userOperation"`
+	EntryPointAddress string          `json:"entryPointAddress" example:"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"`
+	CreatedAt         string          `json:"createdAt" example:"2025-01-09 13:36:56"`
+	UpdatedAt         string          `json:"updatedAt" example:"2025-01-09 13:36:56"`
+}
+
+// toJobResponse converts a domain Job to a JobResponse with formatted time fields
+func toJobResponse(job *domain.Job) JobResponse {
+	return JobResponse{
+		ID:                job.ID.String(),
+		AccountAddress:    job.AccountAddress,
+		ChainID:           job.ChainID,
+		OnChainJobID:      job.OnChainJobID,
+		UserOperation:     job.UserOperation,
+		EntryPointAddress: job.EntryPointAddress,
+		CreatedAt:         job.CreatedAt.Format(TimeFormat),
+		UpdatedAt:         job.UpdatedAt.Format(TimeFormat),
+	}
 }
 
 // RegisterJob godoc
@@ -94,6 +125,8 @@ func (h *JobHandler) RegisterJob(c *gin.Context) {
 		ChainID:        job.ChainID,
 		JobID:          job.OnChainJobID,
 		EntryPoint:     job.EntryPointAddress,
+		CreatedAt:      job.CreatedAt.Format(TimeFormat),
+		UpdatedAt:      job.UpdatedAt.Format(TimeFormat),
 		Message:        "Job registered successfully",
 	}
 
@@ -105,4 +138,36 @@ func (h *JobHandler) RegisterJob(c *gin.Context) {
 		Msg("job registered successfully")
 
 	respondWithSuccessAndStatus(c, http.StatusCreated, response, "Job registered successfully")
+}
+
+// GetJobList godoc
+// @Summary Get all active jobs
+// @Description Retrieve a list of all active jobs in the system
+// @Tags jobs
+// @Accept json
+// @Produce json
+// @Success 200 {object} StandardResponse
+// @Failure 500 {object} StandardResponse
+// @Router /jobs [get]
+func (h *JobHandler) GetJobList(c *gin.Context) {
+	logger := h.logger(c.Request.Context()).With().Str("function", "GetJobList").Logger()
+
+	jobs, err := h.jobService.GetAllActiveJobs(c.Request.Context())
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to retrieve jobs")
+		respondWithError(c, err)
+		return
+	}
+
+	// Convert domain jobs to response DTOs with formatted time fields
+	jobResponses := make([]JobResponse, len(jobs))
+	for i, job := range jobs {
+		jobResponses[i] = toJobResponse(job)
+	}
+
+	logger.Info().
+		Int("job_count", len(jobs)).
+		Msg("job list retrieved successfully")
+
+	respondWithSuccess(c, jobResponses)
 }

@@ -33,11 +33,8 @@ type ErrorMessage struct {
 }
 
 // respondWithSuccess sends a successful response with the standard format
-func respondWithSuccess(c *gin.Context, data interface{}, message ...string) {
+func respondWithSuccess(c *gin.Context, data interface{}) {
 	msg := "OK"
-	if len(message) > 0 && message[0] != "" {
-		msg = message[0]
-	}
 
 	response := StandardResponse{
 		Code:    0,

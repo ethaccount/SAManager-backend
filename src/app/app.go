@@ -235,6 +235,7 @@ func (app *Application) registerRoutes(ctx context.Context, router *gin.Engine) 
 		// v1.POST("/login/verify", passkeyHandler.LoginVerify)
 
 		// Job management endpoints
+		v1.GET("/jobs", jobHandler.GetJobList)
 		v1.POST("/jobs", jobHandler.RegisterJob)
 	}
 }

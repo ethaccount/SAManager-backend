@@ -14,5 +14,5 @@ import (
 // @Router /health [get]
 func HandleHealthCheck(c *gin.Context) {
 	data := map[string]string{"status": "healthy"}
-	respondWithSuccess(c, data, "OK")
+	respondWithSuccess(c, data)
 }
