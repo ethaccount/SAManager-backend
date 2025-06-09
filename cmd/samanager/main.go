@@ -121,9 +121,6 @@ func main() {
 	// Cancel root context to signal all workers to stop
 	rootCancel()
 
-	// Shutdown application repositories
-	app.Shutdown(rootCtx)
-
 	// Wait for all workers to complete with timeout
 	waitChan := make(chan struct{})
 	go func() {
@@ -137,6 +134,9 @@ func main() {
 	case <-time.After(15 * time.Second):
 		logger.Error().Msg("Timeout waiting for workers to shut down")
 	}
+
+	// Shutdown application
+	app.Shutdown(rootCtx)
 
 	logger.Info().Msg("Application shutdown complete")
 }

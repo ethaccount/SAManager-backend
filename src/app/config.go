@@ -97,7 +97,7 @@ func NewAppConfig() *AppConfig {
 
 	// Add polling interval configuration
 	pollingIntervalStr := os.Getenv("POLLING_INTERVAL")
-	pollingInterval := 10 // default to 10 seconds
+	pollingInterval := 60 // default to 1 minute
 	if pollingIntervalStr != "" {
 		if parsed, err := strconv.Atoi(pollingIntervalStr); err == nil {
 			pollingInterval = parsed

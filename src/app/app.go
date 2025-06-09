@@ -31,6 +31,7 @@ type Application struct {
 	redis          *redis.Client
 	PasskeyService *service.PasskeyService
 	JobService     *service.JobService
+	Scheduler      *service.JobScheduler
 }
 
 func NewApplication(ctx context.Context, config AppConfig) *Application {
@@ -50,6 +51,7 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 		logger.Error().Err(err).Msg("connection to redis failed")
 		return nil
 	}
+	logger.Info().Msg("Redis connection established")
 
 	// Connect to database
 	database, err := gorm.Open(postgresDriver.Open(*config.DSN), &gorm.Config{})
@@ -57,6 +59,20 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 		logger.Error().Err(err).Msg("connection to database failed")
 		return nil
 	}
+
+	// Test database connection
+	db, err := database.DB()
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to get underlying database connection")
+		return nil
+	}
+
+	if err := db.Ping(); err != nil {
+		logger.Error().Err(err).Msg("connection to database failed")
+		return nil
+	}
+
+	logger.Info().Msg("Database connection established")
 
 	// run migration files
 	migrationPath := "file://migrations"
@@ -81,6 +97,9 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 	// Job Service
 	jobRepo := repository.NewJobRepository(database)
 	jobService := service.NewJobService(jobRepo)
+
+	// Scheduler
+	scheduler := service.NewJobScheduler(ctx, rdb, "job_queue", *config.PollingInterval, jobService)
 
 	// Blockchain Service
 	// blockchainService := service.NewBlockchainService(service.BlockchainConfig{
@@ -110,6 +129,7 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 		redis:          rdb,
 		PasskeyService: passkeyService,
 		JobService:     jobService,
+		Scheduler:      scheduler,
 	}
 }
 
@@ -143,7 +163,7 @@ func (app *Application) Shutdown(ctx context.Context) {
 func (app *Application) RunHTTPServer(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	logger := zerolog.Ctx(ctx).With().Str("function", "RunHTTP").Logger()
+	logger := zerolog.Ctx(ctx).With().Str("function", "RunHTTPServer").Logger()
 
 	// Set to release mode to disable Gin logger
 	gin.SetMode(gin.ReleaseMode)
@@ -188,23 +208,14 @@ func (app *Application) RunHTTPServer(ctx context.Context, wg *sync.WaitGroup) {
 func (app *Application) RunPollingWorker(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	logger := zerolog.Ctx(ctx).With().Str("function", "RunPollingServer").Logger()
+	logger := zerolog.Ctx(ctx).With().Str("function", "RunPollingWorker").Logger()
 	logger.Info().Msg("Starting polling worker")
 
-	ticker := time.NewTicker(time.Duration(*app.config.PollingInterval) * time.Second)
-
-	for {
-		select {
-		case <-ctx.Done():
-			logger.Info().Msg("Gracefully shutting down polling worker...")
-			ticker.Stop()
-			return
-
-		case <-ticker.C:
-			logger.Info().Msg("Polling...")
-			// app.Scheduler.poll(ctx)
-		}
-	}
+	app.Scheduler.Start()
+	<-ctx.Done()
+	logger.Info().Msg("Stopping polling worker...")
+	app.Scheduler.Stop()
+	logger.Info().Msg("Polling worker stopped")
 }
 
 func (app *Application) registerRoutes(ctx context.Context, router *gin.Engine) {
