@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ethaccount/backend/erc4337"
 	"github.com/ethaccount/backend/src/domain"
 
 	"github.com/ethereum/go-ethereum"
@@ -285,9 +286,9 @@ func (b *BlockchainService) GetBundlerURL(chainId int64) (string, error) {
 }
 
 // SendUserOperation sends a user operation to the bundler
-func (b *BlockchainService) SendUserOperation(ctx context.Context, userOp *domain.UserOperation, entryPoint string, chainId int64) (string, error) {
+func (b *BlockchainService) SendUserOperation(ctx context.Context, userOp *erc4337.UserOperation, entryPoint string, chainId int64) (string, error) {
 	b.logger(ctx).Debug().
-		Str("sender", userOp.Sender).
+		Str("sender", userOp.Sender.Hex()).
 		Int64("chain_id", chainId).
 		Str("entry_point", entryPoint).
 		Msg("sending user operation to bundler")
@@ -356,7 +357,7 @@ func (b *BlockchainService) SendUserOperation(ctx context.Context, userOp *domai
 
 	b.logger(ctx).Info().
 		Str("user_op_hash", rpcResponse.Result).
-		Str("sender", userOp.Sender).
+		Str("sender", userOp.Sender.Hex()).
 		Int64("chain_id", chainId).
 		Msg("successfully sent user operation to bundler")
 

@@ -3,9 +3,12 @@ package service
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
+	"math/big"
 
 	"github.com/ethaccount/backend/src/domain"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/rs/zerolog"
 )
@@ -34,8 +37,14 @@ func (s *ExecutionService) logger(ctx context.Context) *zerolog.Logger {
 	return &l
 }
 
+// personalSignHash creates an Ethereum signed message hash
+func personalSignHash(data []byte) common.Hash {
+	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)
+	return crypto.Keccak256Hash([]byte(msg))
+}
+
 // ExecuteJob signs the user operation and sends it to the bundler
-func (s *ExecutionService) ExecuteJob(ctx context.Context, job *domain.Job) (string, error) {
+func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.Job) (string, error) {
 	s.logger(ctx).Info().
 		Str("job_id", job.ID.String()).
 		Str("account_address", job.AccountAddress).
@@ -53,14 +62,43 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job *domain.Job) (str
 	}
 
 	// Create user operation hash for signing
-
-	// Sign the user operation hash
-
-	// Append signature to user operation
+	hash, err := userOp.GetUserOpHashV07(big.NewInt(job.ChainID))
+	if err != nil {
+		s.logger(ctx).Error().Err(err).
+			Str("job_id", job.ID.String()).
+			Msg("failed to calculate user operation hash")
+		return "", fmt.Errorf("failed to calculate user operation hash: %w", err)
+	}
 
 	s.logger(ctx).Debug().
 		Str("job_id", job.ID.String()).
-		Str("signature", userOp.Signature).
+		Str("user_op_hash", hash.Hex()).
+		Msg("calculated user operation hash")
+
+	// Sign the user operation hash
+	signature, err := crypto.Sign(personalSignHash(hash.Bytes()).Bytes(), s.privateKey)
+	if err != nil {
+		s.logger(ctx).Error().Err(err).
+			Str("job_id", job.ID.String()).
+			Msg("failed to sign user operation hash")
+		return "", fmt.Errorf("failed to sign user operation hash: %w", err)
+	}
+
+	// Adjust signature format for Ethereum (recovery ID + 27)
+	signature[64] += 27
+
+	s.logger(ctx).Debug().
+		Str("job_id", job.ID.String()).
+		Str("signature", "0x"+hex.EncodeToString(signature)).
+		Msg("generated signature")
+
+	// Append signature to user operation (preserve any existing signature prefix)
+	leadingSignature := userOp.Signature
+	userOp.Signature = append(leadingSignature, signature...)
+
+	s.logger(ctx).Debug().
+		Str("job_id", job.ID.String()).
+		Str("signature", hex.EncodeToString(userOp.Signature)).
 		Msg("user operation signed successfully")
 
 	// Send user operation to bundler

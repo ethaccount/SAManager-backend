@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethaccount/backend/erc4337"
 	"github.com/google/uuid"
 )
 
@@ -22,8 +23,8 @@ type Job struct {
 }
 
 // GetUserOperation returns the user operation as a typed struct
-func (j *Job) GetUserOperation() (*UserOperation, error) {
-	var userOp UserOperation
+func (j *Job) GetUserOperation() (*erc4337.UserOperation, error) {
+	var userOp erc4337.UserOperation
 	if err := json.Unmarshal(j.UserOperation, &userOp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal user operation: %w", err)
 	}

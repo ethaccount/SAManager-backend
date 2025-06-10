@@ -102,7 +102,6 @@ func getCurrentNonce(ctx context.Context, rpcClient *rpc.Client, sender common.A
 
 // getMaxFeePerGas fetches the latest block and max priority fee, then calculates maxFeePerGas
 func getMaxFeePerGas(ctx context.Context, rpcClient *rpc.Client) (*big.Int, *big.Int, error) {
-	// Make parallel RPC calls
 	var blockResult *Block
 	var maxPriorityFeeResult string
 
@@ -152,10 +151,16 @@ func getMaxFeePerGas(ctx context.Context, rpcClient *rpc.Client) (*big.Int, *big
 	return maxFeePerGas, maxPriorityFeePerGas, nil
 }
 
+// personalSignHash creates an Ethereum signed message hash
+func personalSignHash(data []byte) common.Hash {
+	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)
+	return crypto.Keccak256Hash([]byte(msg))
+}
+
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Error loading .env file")
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 
 	rpcUrl := os.Getenv("SEPOLIA_RPC_URL")
@@ -176,95 +181,80 @@ func main() {
 		log.Fatalf("Failed to parse private key: %v", err)
 	}
 
-	// print the public key
+	// Display signing address
 	address := crypto.PubkeyToAddress(privateKey.PublicKey)
-	fmt.Printf("Address: %s\n", address.Hex())
+	log.Printf("Signing with address: %s", address.Hex())
 
 	// Parse the user operation from JSON
 	var userOp erc4337.UserOperation
-	err = json.Unmarshal([]byte(userOpJSON), &userOp)
-	if err != nil {
+	if err := json.Unmarshal([]byte(userOpJSON), &userOp); err != nil {
 		log.Fatalf("Failed to parse user operation: %v", err)
 	}
 
 	ctx := context.Background()
 
+	// Connect to bundler
 	c, err := erc4337.DialContext(ctx, rpcUrl)
 	if err != nil {
 		log.Fatalf("Failed to connect to bundler: %v", err)
 	}
 
-	// Create direct RPC client for gas fee calculations and nonce fetching
+	// Create RPC client for direct blockchain calls
 	rpcClient, err := rpc.DialContext(ctx, rpcUrl)
 	if err != nil {
 		log.Fatalf("Failed to create RPC client: %v", err)
 	}
 	defer rpcClient.Close()
 
-	// Extract nonce key from the original nonce and get current nonce from entrypoint
+	// Extract nonce key and get current nonce from entrypoint
 	nonceKey, err := extractNonceKey(userOp.Nonce)
 	if err != nil {
 		log.Fatalf("Failed to extract nonce key: %v", err)
 	}
 
-	fmt.Printf("Extracted nonce key: 0x%x\n", nonceKey)
+	log.Printf("Extracted nonce key: 0x%x", nonceKey)
 
-	// Get current nonce from entrypoint contract
 	currentNonce, err := getCurrentNonce(ctx, rpcClient, userOp.Sender, nonceKey)
 	if err != nil {
 		log.Fatalf("Failed to get current nonce: %v", err)
 	}
 
-	fmt.Printf("Current nonce from entrypoint: 0x%x\n", currentNonce)
+	log.Printf("Current nonce from entrypoint: 0x%x", currentNonce)
 
 	// Update user operation with current nonce
 	userOp.Nonce = (*hexutil.Big)(currentNonce)
 
-	// Add paymaster
+	// Set paymaster
 	paymaster := common.HexToAddress("0xcD1c62f36A99f306948dB76c35Bbc1A639f92ce8")
 	userOp.Paymaster = &paymaster
 
-	// Add dummy signature
-	var dummySignature = "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c"
-
+	// Add dummy signature for gas estimation
+	dummySignature := "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c"
 	decodedDummySignature, err := hexutil.Decode(dummySignature)
 	if err != nil {
 		log.Fatalf("Failed to decode dummy signature: %v", err)
 	}
 
 	leadingSignature := userOp.Signature
-
-	// append dummy signature
 	userOp.Signature = append(userOp.Signature, decodedDummySignature...)
 
-	// Estimate gas
+	// Estimate gas values
 	estimates, err := c.EstimateUserOperationGas(ctx, &userOp, erc4337.EntryPointV07)
 	if err != nil {
 		log.Fatalf("Failed to estimate user operation gas: %v", err)
 	}
 
-	// Get max fee per gas and max priority fee per gas
+	// Get gas fees
 	maxFeePerGas, maxPriorityFeePerGas, err := getMaxFeePerGas(ctx, rpcClient)
 	if err != nil {
 		log.Fatalf("Failed to get gas fees: %v", err)
 	}
 
-	fmt.Printf("Gas Values:\n")
-	fmt.Printf("  MaxFeePerGas: %s\n", maxFeePerGas.String())
-	fmt.Printf("  MaxPriorityFeePerGas: %s\n", maxPriorityFeePerGas.String())
+	log.Printf("Gas fees - MaxFeePerGas: %s, MaxPriorityFeePerGas: %s", maxFeePerGas.String(), maxPriorityFeePerGas.String())
+	log.Printf("Gas estimates - PreVerificationGas: %s, VerificationGasLimit: %s, CallGasLimit: %s",
+		estimates.PreVerificationGas.String(), estimates.VerificationGasLimit.String(), estimates.CallGasLimit.String())
 
-	fmt.Printf("Gas Estimates:\n")
-	fmt.Printf("  PreVerificationGas: %s\n", estimates.PreVerificationGas.String())
-	fmt.Printf("  VerificationGasLimit: %s\n", estimates.VerificationGasLimit.String())
-	fmt.Printf("  CallGasLimit: %s\n", estimates.CallGasLimit.String())
-
-	if estimates.PaymasterVerificationGasLimit != nil {
-		fmt.Printf("  PaymasterVerificationGasLimit: %s\n", estimates.PaymasterVerificationGasLimit.String())
-	} else {
-		fmt.Printf("  PaymasterVerificationGasLimit: <nil>\n")
-	}
-
-	// Add gas values to user operation
+	// Update user operation with gas values
 	userOp.PreVerificationGas = (*hexutil.Big)(estimates.PreVerificationGas)
 	userOp.VerificationGasLimit = (*hexutil.Big)(estimates.VerificationGasLimit)
 	userOp.CallGasLimit = (*hexutil.Big)(estimates.CallGasLimit)
@@ -272,37 +262,22 @@ func main() {
 	userOp.MaxFeePerGas = (*hexutil.Big)(maxFeePerGas)
 	userOp.MaxPriorityFeePerGas = (*hexutil.Big)(maxPriorityFeePerGas)
 
-	// print packed user operation
-	packedUserOp := userOp.PackUserOp()
-	packedUserOpJSON, err := json.MarshalIndent(packedUserOp, "", "  ")
-	if err != nil {
-		log.Fatalf("Failed to marshal packed user operation: %v", err)
-	}
-	fmt.Printf("Packed User Operation: %s\n", string(packedUserOpJSON))
-
-	// Print the user operation
-	userOpJSON, err := json.MarshalIndent(userOp, "", "  ")
-	if err != nil {
-		log.Fatalf("Failed to marshal user operation: %v", err)
-	}
-	fmt.Printf("User Operation: %s\n", string(userOpJSON))
-
-	// userOpHash
+	// Calculate user operation hash
 	hash, err := userOp.GetUserOpHashV07(big.NewInt(11155111))
 	if err != nil {
 		log.Fatalf("Failed to calculate user operation hash: %v", err)
 	}
-	fmt.Printf("User Operation Hash: %s\n", hash.Hex())
+	log.Printf("User Operation Hash: %s", hash.Hex())
 
+	// Sign the user operation hash
 	signature, err := crypto.Sign(personalSignHash(hash.Bytes()).Bytes(), privateKey)
 	if err != nil {
 		log.Fatalf("Failed to sign user operation hash: %v", err)
 	}
 
-	// https://stackoverflow.com/questions/69762108/implementing-ethereum-personal-sign-eip-191-from-go-ethereum-gives-different-s
+	// Adjust signature format for Ethereum (recovery ID + 27)
 	signature[64] += 27
-
-	fmt.Println("0x" + hex.EncodeToString(signature))
+	log.Printf("Generated signature: 0x%s", hex.EncodeToString(signature))
 
 	// Update the signature in the user operation
 	userOp.Signature = append(leadingSignature, signature...)
@@ -313,49 +288,42 @@ func main() {
 		log.Fatalf("Failed to send user operation: %v", err)
 	}
 
-	fmt.Printf("User Operation sent successfully!\n")
-	fmt.Printf("User Operation Hash: %s\n", userOpHash.Hex())
+	log.Printf("User Operation sent successfully! Hash: %s", userOpHash.Hex())
 
 	// Poll for user operation receipt
-	fmt.Printf("Polling for user operation receipt...\n")
-	maxAttempts := 60               // Maximum number of polling attempts
-	pollInterval := 2 * time.Second // Wait 2 seconds between polls
+	log.Printf("Polling for user operation receipt...")
+	maxAttempts := 60
+	pollInterval := 2 * time.Second
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		fmt.Printf("Attempt %d/%d: Checking for receipt...\n", attempt, maxAttempts)
+		log.Printf("Attempt %d/%d: Checking for receipt...", attempt, maxAttempts)
 
 		receipt, err := c.GetUserOperationReceipt(ctx, userOpHash)
 		if err != nil {
-			fmt.Printf("Receipt not yet available (attempt %d): %v\n", attempt, err)
+			log.Printf("Receipt not yet available (attempt %d): %v", attempt, err)
 		} else {
-			fmt.Printf("User Operation Receipt received!\n")
-			fmt.Printf("  UserOpHash: %s\n", receipt.UserOpHash.Hex())
-			fmt.Printf("  Sender: %s\n", receipt.Sender.Hex())
-			fmt.Printf("  Success: %t\n", receipt.Success)
-			fmt.Printf("  ActualGasCost: %s\n", receipt.ActualGasCost)
-			fmt.Printf("  ActualGasUsed: %s\n", receipt.ActualGasUsed)
+			log.Printf("User Operation Receipt received!")
+			log.Printf("  UserOpHash: %s", receipt.UserOpHash.Hex())
+			log.Printf("  Sender: %s", receipt.Sender.Hex())
+			log.Printf("  Success: %t", receipt.Success)
+			log.Printf("  ActualGasCost: %s", receipt.ActualGasCost)
+			log.Printf("  ActualGasUsed: %s", receipt.ActualGasUsed)
 			if receipt.Paymaster != (common.Address{}) {
-				fmt.Printf("  Paymaster: %s\n", receipt.Paymaster.Hex())
+				log.Printf("  Paymaster: %s", receipt.Paymaster.Hex())
 			}
-			fmt.Printf("  Nonce: %s\n", receipt.Nonce)
+			log.Printf("  Nonce: %s", receipt.Nonce)
 			if receipt.Receipt != nil {
-				fmt.Printf("  Transaction Hash: %s\n", receipt.Receipt.TransactionHash.Hex())
-				fmt.Printf("  Block Number: %s\n", receipt.Receipt.BlockNumber)
-				fmt.Printf("  Gas Used: %s\n", receipt.Receipt.GasUsed)
+				log.Printf("  Transaction Hash: %s", receipt.Receipt.TransactionHash.Hex())
+				log.Printf("  Block Number: %s", receipt.Receipt.BlockNumber)
+				log.Printf("  Gas Used: %s", receipt.Receipt.GasUsed)
 			}
 			return
 		}
 
 		if attempt < maxAttempts {
-			fmt.Printf("Waiting %v before next attempt...\n", pollInterval)
 			time.Sleep(pollInterval)
 		}
 	}
 
-	fmt.Printf("Failed to get user operation receipt after %d attempts\n", maxAttempts)
-}
-
-func personalSignHash(data []byte) common.Hash {
-	msg := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(data), data)
-	return crypto.Keccak256Hash([]byte(msg))
+	log.Printf("Failed to get user operation receipt after %d attempts", maxAttempts)
 }

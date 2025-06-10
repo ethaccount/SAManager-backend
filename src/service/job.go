@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/ethaccount/backend/erc4337"
 	"github.com/ethaccount/backend/src/domain"
 	"github.com/ethaccount/backend/src/repository"
 	"github.com/rs/zerolog"
@@ -25,7 +26,7 @@ func (s *JobService) logger(ctx context.Context) *zerolog.Logger {
 }
 
 // RegisterJob creates a new job registration
-func (s *JobService) RegisterJob(ctx context.Context, accountAddress string, chainId int64, jobID int64, userOperation *domain.UserOperation, entryPoint string) (*domain.Job, error) {
+func (s *JobService) RegisterJob(ctx context.Context, accountAddress string, chainId int64, jobID int64, userOperation *erc4337.UserOperation, entryPoint string) (*domain.Job, error) {
 	s.logger(ctx).Debug().
 		Str("function", "RegisterJob").
 		Str("account_address", accountAddress).

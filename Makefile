@@ -1,6 +1,6 @@
 .PHONY: run # .PHONY is to make always executes the commands regardless of whether a file named "run" exists.
 run:
-	go run cmd/samanager/main.go
+	trap 'exit 0' INT; go run cmd/samanager/main.go
 
 build:
 	go build -o bin/samanager cmd/samanager/main.go

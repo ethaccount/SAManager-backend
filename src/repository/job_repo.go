@@ -3,6 +3,7 @@ package repository
 import (
 	"encoding/json"
 
+	"github.com/ethaccount/backend/erc4337"
 	"github.com/ethaccount/backend/src/domain"
 	"gorm.io/gorm"
 )
@@ -15,7 +16,7 @@ func NewJobRepository(db *gorm.DB) *JobRepository {
 	return &JobRepository{db: db}
 }
 
-func (r *JobRepository) RegisterJob(accountAddress string, chainId int64, jobID int64, userOperation *domain.UserOperation, entryPoint string) (*domain.Job, error) {
+func (r *JobRepository) RegisterJob(accountAddress string, chainId int64, jobID int64, userOperation *erc4337.UserOperation, entryPoint string) (*domain.Job, error) {
 	userOpJSON, err := json.Marshal(userOperation)
 	if err != nil {
 		return nil, err

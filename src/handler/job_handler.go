@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/ethaccount/backend/erc4337"
 	"github.com/ethaccount/backend/src/domain"
 	"github.com/ethaccount/backend/src/service"
 
@@ -32,11 +33,11 @@ func (s *JobHandler) logger(ctx context.Context) *zerolog.Logger {
 
 // RegisterJobRequest represents the request payload for job registration
 type RegisterJobRequest struct {
-	AccountAddress string                `json:"accountAddress" binding:"required" example:"0x1234567890123456789012345678901234567890"`
-	ChainID        int64                 `json:"chainId" binding:"required" example:"11155111"`
-	JobID          int64                 `json:"jobId" binding:"required" example:"1"`
-	UserOperation  *domain.UserOperation `json:"userOperation" binding:"required"`
-	EntryPoint     string                `json:"entryPoint" binding:"required" example:"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"`
+	AccountAddress string                 `json:"accountAddress" binding:"required" example:"0x1234567890123456789012345678901234567890"`
+	ChainID        int64                  `json:"chainId" binding:"required" example:"11155111"`
+	JobID          int64                  `json:"jobId" binding:"required" example:"1"`
+	UserOperation  *erc4337.UserOperation `json:"userOperation" binding:"required"`
+	EntryPoint     string                 `json:"entryPoint" binding:"required" example:"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"`
 }
 
 // RegisterJobResponse represents the response for job registration

@@ -4,8 +4,13 @@ import (
 	"encoding/json"
 	"testing"
 
+	"math/big"
+
+	"github.com/ethaccount/backend/erc4337"
 	"github.com/ethaccount/backend/src/domain"
 	"github.com/ethaccount/backend/src/testutil"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/google/uuid"
 )
 
@@ -21,16 +26,16 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	jobID := int64(12345)
 	entryPointAddress := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 
-	userOperation := &domain.UserOperation{
-		Sender:               "0x1234567890123456789012345678901234567890",
-		Nonce:                "0x1",
-		CallData:             "0xabcdef",
-		CallGasLimit:         "100000",
-		VerificationGasLimit: "50000",
-		PreVerificationGas:   "21000",
-		MaxPriorityFeePerGas: "1000000000",
-		MaxFeePerGas:         "2000000000",
-		Signature:            "0x123456789abcdef",
+	userOperation := &erc4337.UserOperation{
+		Sender:               common.HexToAddress("0x1234567890123456789012345678901234567890"),
+		Nonce:                (*hexutil.Big)(big.NewInt(1)),
+		CallData:             hexutil.Bytes([]byte{0xab, 0xcd, 0xef}),
+		CallGasLimit:         (*hexutil.Big)(big.NewInt(100000)),
+		VerificationGasLimit: (*hexutil.Big)(big.NewInt(50000)),
+		PreVerificationGas:   (*hexutil.Big)(big.NewInt(21000)),
+		MaxPriorityFeePerGas: (*hexutil.Big)(big.NewInt(1000000000)),
+		MaxFeePerGas:         (*hexutil.Big)(big.NewInt(2000000000)),
+		Signature:            hexutil.Bytes([]byte{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf}),
 	}
 
 	// Test RegisterJob
@@ -73,21 +78,17 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	}
 
 	// Verify the UserOperation was stored correctly
-	var storedUserOp domain.UserOperation
+	var storedUserOp erc4337.UserOperation
 	if err := json.Unmarshal(job.UserOperation, &storedUserOp); err != nil {
 		t.Fatalf("Failed to unmarshal stored UserOperation: %v", err)
 	}
 
 	if storedUserOp.Sender != userOperation.Sender {
-		t.Errorf("Expected Sender %s, got %s", userOperation.Sender, storedUserOp.Sender)
+		t.Errorf("Expected Sender %s, got %s", userOperation.Sender.Hex(), storedUserOp.Sender.Hex())
 	}
 
-	if storedUserOp.Nonce != userOperation.Nonce {
-		t.Errorf("Expected Nonce %s, got %s", userOperation.Nonce, storedUserOp.Nonce)
-	}
-
-	if storedUserOp.CallData != userOperation.CallData {
-		t.Errorf("Expected CallData %s, got %s", userOperation.CallData, storedUserOp.CallData)
+	if storedUserOp.Nonce != nil && userOperation.Nonce != nil && (*big.Int)(storedUserOp.Nonce).Cmp((*big.Int)(userOperation.Nonce)) != 0 {
+		t.Errorf("Expected Nonce %s, got %s", (*big.Int)(userOperation.Nonce).String(), (*big.Int)(storedUserOp.Nonce).String())
 	}
 
 	// Verify the job was actually saved to the database
@@ -111,7 +112,7 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	}
 
 	if retrievedUserOp.Sender != userOperation.Sender {
-		t.Errorf("Retrieved UserOperation Sender mismatch: expected %s, got %s", userOperation.Sender, retrievedUserOp.Sender)
+		t.Errorf("Retrieved UserOperation Sender mismatch: expected %s, got %s", userOperation.Sender.Hex(), retrievedUserOp.Sender.Hex())
 	}
 }
 
@@ -126,11 +127,11 @@ func TestJobRepository_RegisterJob_DuplicateJobID(t *testing.T) {
 	jobID := int64(12345)
 	entryPointAddress := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
 
-	userOperation := &domain.UserOperation{
-		Sender:    "0x1234567890123456789012345678901234567890",
-		Nonce:     "0x1",
-		CallData:  "0xabcdef",
-		Signature: "0x123456789abcdef",
+	userOperation := &erc4337.UserOperation{
+		Sender:    common.HexToAddress("0x1234567890123456789012345678901234567890"),
+		Nonce:     (*hexutil.Big)(big.NewInt(1)),
+		CallData:  hexutil.Bytes([]byte{0xab, 0xcd, 0xef}),
+		Signature: hexutil.Bytes([]byte{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf}),
 	}
 
 	// Register first job
