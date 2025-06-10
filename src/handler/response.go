@@ -65,9 +65,15 @@ func respondWithSuccessAndStatus(c *gin.Context, httpStatus int, data interface{
 func respondWithError(c *gin.Context, err error) {
 	domainErr := parseDomainError(err)
 
+	// Use the original error message if the domain error has no client message
+	message := domainErr.ClientMsg()
+	if message == "" {
+		message = err.Error()
+	}
+
 	response := StandardResponse{
 		Code:    mapDomainErrorToCode(domainErr),
-		Message: domainErr.ClientMsg(),
+		Message: message,
 	}
 
 	// Add error details if available
