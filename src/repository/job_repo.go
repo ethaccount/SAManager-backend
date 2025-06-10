@@ -45,3 +45,12 @@ func (r *JobRepository) GetAllJobs() ([]*domain.Job, error) {
 	}
 	return jobs, nil
 }
+
+// GetJobByID retrieves a specific job by its ID
+func (r *JobRepository) GetJobByID(id string) (*domain.Job, error) {
+	var job domain.Job
+	if err := r.db.Where("id = ?", id).First(&job).Error; err != nil {
+		return nil, err
+	}
+	return &job, nil
+}

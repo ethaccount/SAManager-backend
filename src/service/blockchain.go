@@ -1,13 +1,9 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"math/big"
-	"net/http"
 	"strings"
 
 	"github.com/ethaccount/backend/erc4337"
@@ -285,81 +281,33 @@ func (b *BlockchainService) GetBundlerURL(chainId int64) (string, error) {
 	}
 }
 
-// SendUserOperation sends a user operation to the bundler
-func (b *BlockchainService) SendUserOperation(ctx context.Context, userOp *erc4337.UserOperation, entryPoint string, chainId int64) (string, error) {
+// GetBundlerClient returns a bundler client for a given chain ID
+func (b *BlockchainService) GetBundlerClient(ctx context.Context, chainId int64) (erc4337.Bundler, error) {
 	b.logger(ctx).Debug().
-		Str("sender", userOp.Sender.Hex()).
 		Int64("chain_id", chainId).
-		Str("entry_point", entryPoint).
-		Msg("sending user operation to bundler")
+		Msg("creating bundler client")
 
 	bundlerURL, err := b.GetBundlerURL(chainId)
 	if err != nil {
 		b.logger(ctx).Error().Err(err).
 			Int64("chain_id", chainId).
 			Msg("failed to get bundler URL")
-		return "", err
+		return nil, err
 	}
 
-	// Prepare JSON-RPC request
-	rpcRequest := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"method":  "eth_sendUserOperation",
-		"params":  []interface{}{userOp, entryPoint},
-		"id":      1,
-	}
-
-	requestBody, err := json.Marshal(rpcRequest)
-	if err != nil {
-		b.logger(ctx).Error().Err(err).Msg("failed to marshal RPC request")
-		return "", fmt.Errorf("failed to marshal RPC request: %w", err)
-	}
-
-	// Send HTTP request to bundler
-	resp, err := http.Post(bundlerURL, "application/json", bytes.NewBuffer(requestBody))
+	bundlerClient, err := erc4337.DialContext(ctx, bundlerURL)
 	if err != nil {
 		b.logger(ctx).Error().Err(err).
 			Str("bundler_url", bundlerURL).
-			Msg("failed to send request to bundler")
-		return "", fmt.Errorf("failed to send request to bundler: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Read response
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		b.logger(ctx).Error().Err(err).Msg("failed to read bundler response")
-		return "", fmt.Errorf("failed to read bundler response: %w", err)
+			Int64("chain_id", chainId).
+			Msg("failed to create bundler client")
+		return nil, fmt.Errorf("failed to create bundler client for chain %d: %w", chainId, err)
 	}
 
-	// Parse JSON-RPC response
-	var rpcResponse struct {
-		JSONRPC string      `json:"jsonrpc"`
-		ID      int         `json:"id"`
-		Result  string      `json:"result,omitempty"`
-		Error   interface{} `json:"error,omitempty"`
-	}
-
-	if err := json.Unmarshal(responseBody, &rpcResponse); err != nil {
-		b.logger(ctx).Error().Err(err).
-			Str("response_body", string(responseBody)).
-			Msg("failed to parse bundler response")
-		return "", fmt.Errorf("failed to parse bundler response: %w", err)
-	}
-
-	// Check for RPC error
-	if rpcResponse.Error != nil {
-		b.logger(ctx).Error().
-			Interface("rpc_error", rpcResponse.Error).
-			Msg("bundler returned error")
-		return "", fmt.Errorf("bundler error: %v", rpcResponse.Error)
-	}
-
-	b.logger(ctx).Info().
-		Str("user_op_hash", rpcResponse.Result).
-		Str("sender", userOp.Sender.Hex()).
+	b.logger(ctx).Debug().
 		Int64("chain_id", chainId).
-		Msg("successfully sent user operation to bundler")
+		Str("bundler_url", bundlerURL).
+		Msg("successfully created bundler client")
 
-	return rpcResponse.Result, nil
+	return bundlerClient, nil
 }

@@ -12,7 +12,6 @@ import (
 
 	"github.com/ethaccount/backend/src/app"
 	"github.com/joho/godotenv"
-	"github.com/rs/zerolog"
 
 	"github.com/ethaccount/backend/docs/swagger"
 	_ "github.com/ethaccount/backend/docs/swagger"
@@ -40,28 +39,6 @@ const (
 	AppBuild   = "dev"
 )
 
-func initLogger(levelStr string) zerolog.Logger {
-	// Set global log level
-	level, err := zerolog.ParseLevel(levelStr)
-	if err != nil {
-		level = zerolog.InfoLevel
-	}
-	zerolog.SetGlobalLevel(level)
-
-	// Add color and formatting
-	output := zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		NoColor:    false,
-		TimeFormat: "2006-01-02 15:04:05",
-	}
-
-	logger := zerolog.New(output).With().
-		Timestamp().
-		Logger()
-
-	return logger
-}
-
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -79,7 +56,7 @@ func main() {
 	}
 
 	// Create root logger
-	logger := initLogger(*config.LogLevel)
+	logger := app.InitLogger(*config.LogLevel)
 
 	// Create root context
 	rootCtx, rootCancel := context.WithCancel(context.Background())

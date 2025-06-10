@@ -63,3 +63,24 @@ func (s *JobService) GetAllActiveJobs(ctx context.Context) ([]*domain.Job, error
 	s.logger(ctx).Debug().Int("job_count", len(jobs)).Msg("retrieved jobs from repository")
 	return jobs, nil
 }
+
+// GetJobByID retrieves a specific job by its ID
+func (s *JobService) GetJobByID(ctx context.Context, id string) (*domain.Job, error) {
+	s.logger(ctx).Debug().
+		Str("function", "GetJobByID").
+		Str("job_id", id).
+		Msg("retrieving job by ID")
+
+	job, err := s.jobRepo.GetJobByID(id)
+	if err != nil {
+		s.logger(ctx).Error().Err(err).
+			Str("job_id", id).
+			Msg("failed to retrieve job from repository")
+		return nil, err
+	}
+
+	s.logger(ctx).Debug().
+		Str("job_id", id).
+		Msg("successfully retrieved job")
+	return job, nil
+}

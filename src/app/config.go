@@ -52,7 +52,7 @@ func NewAppConfig() *AppConfig {
 		port = "8080"
 	}
 
-	// "error", "warn", "info", "debug", "disabled"
+	// zerolog levels: "trace", "debug", "info", "warn", "error", "fatal", "panic", "disabled"
 	logLevel := os.Getenv("LOG_LEVEL")
 	if logLevel == "" {
 		logLevel = "debug"
