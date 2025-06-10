@@ -27,26 +27,24 @@ func (s *JobService) logger(ctx context.Context) *zerolog.Logger {
 
 // RegisterJob creates a new job registration
 func (s *JobService) RegisterJob(ctx context.Context, accountAddress string, chainId int64, jobID int64, userOperation *erc4337.UserOperation, entryPoint string) (*domain.Job, error) {
-	s.logger(ctx).Debug().
+	s.logger(ctx).Info().
 		Str("function", "RegisterJob").
-		Str("account_address", accountAddress).
-		Int64("chain_id", chainId).
-		Int64("job_id", jobID).
-		Str("entry_point", entryPoint).
-		Msg("registering new job")
+		Str("accountAddress", accountAddress).
+		Int64("chainId", chainId).
+		Int64("onChainJobId", jobID).
+		Msg("Registering new job")
 
 	job, err := s.jobRepo.RegisterJob(accountAddress, chainId, jobID, userOperation, entryPoint)
 	if err != nil {
-		s.logger(ctx).Error().Err(err).Msg("failed to register job in repository")
 		return nil, err
 	}
 
 	s.logger(ctx).Info().
-		Str("job_uuid", job.ID.String()).
-		Str("account_address", accountAddress).
-		Int64("chain_id", chainId).
-		Int64("job_id", jobID).
-		Msg("successfully registered job")
+		Str("id", job.ID.String()).
+		Str("accountAddress", accountAddress).
+		Int64("chainId", chainId).
+		Int64("onChainJobId", jobID).
+		Msg("Successfully registered job")
 
 	return job, nil
 }

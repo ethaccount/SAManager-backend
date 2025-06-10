@@ -115,7 +115,6 @@ func (h *JobHandler) RegisterJob(c *gin.Context) {
 		req.EntryPoint,
 	)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to register job")
 		respondWithError(c, err)
 		return
 	}

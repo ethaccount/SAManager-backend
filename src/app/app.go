@@ -11,6 +11,7 @@ import (
 	"github.com/ethaccount/backend/src/handler"
 	"github.com/ethaccount/backend/src/repository"
 	"github.com/ethaccount/backend/src/service"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
@@ -228,6 +229,15 @@ func (app *Application) registerRoutes(ctx context.Context, router *gin.Engine) 
 			return nil
 		}, decimal.Decimal{})
 	}
+
+	// Configure CORS
+	config := cors.DefaultConfig()
+	config.AllowOrigins = *app.config.AllowOrigins
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"}
+	config.AllowCredentials = true
+
+	router.Use(cors.New(config))
 
 	handler.SetMiddlewares(ctx, router)
 

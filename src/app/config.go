@@ -19,6 +19,9 @@ type AppConfig struct {
 	// HTTP configuration
 	Port *string
 
+	// CORS configuration
+	AllowOrigins *[]string
+
 	// Polling configuration
 	PollingInterval *int
 
@@ -104,11 +107,33 @@ func NewAppConfig() *AppConfig {
 		}
 	}
 
+	// CORS origins configuration
+	allowOriginsStr := os.Getenv("ALLOW_ORIGINS")
+	var allowOrigins []string
+	if allowOriginsStr != "" {
+		origins := strings.Split(allowOriginsStr, ",")
+		for _, origin := range origins {
+			origin = strings.TrimSpace(origin)
+			if origin != "" {
+				allowOrigins = append(allowOrigins, origin)
+			}
+		}
+	} else {
+		// Default fallback only in dev mode
+		environment := os.Getenv("ENVIRONMENT")
+		if environment == "development" || environment == "dev" {
+			allowOrigins = []string{"http://localhost:5173"}
+		} else {
+			log.Fatalf("ALLOW_ORIGINS not set in .env file and not in development mode")
+		}
+	}
+
 	return &AppConfig{
 		LogLevel:              &logLevel,
 		DSN:                   &dsn,
 		RedisAddr:             &redisAddr,
 		Port:                  &port,
+		AllowOrigins:          &allowOrigins,
 		PollingInterval:       &pollingInterval,
 		SepoliaRPCURL:         &sepoliaRPCURL,
 		ArbitrumSepoliaRPCURL: &arbitrumSepoliaRPCURL,
