@@ -14,6 +14,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+type CombinedJob struct {
+	JobModel        domain.JobModel
+	ExecutionConfig domain.ExecutionConfig
+}
+
 // JobScheduler manages job scheduling and execution
 type JobScheduler struct {
 	jobCache          *repository.JobCacheRepository
@@ -131,27 +136,32 @@ func (js *JobScheduler) pollJobLogic() {
 		return
 	}
 
-	// Step 4: Validate Job Readiness
+	// Step 4: Fetch Execution Config
+	jobsToExecute, err := js.fetchExecutionConfigsAndFilterJobs(jobs)
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to fetch execution configs and filter jobs")
+		return
+	}
 
 	// Step 5: Enqueue Overdue Jobs
 
-	for _, job := range jobs {
+	for _, job := range jobsToExecute {
 		// Check if job should be skipped based on status in cache
-		if js.shouldSkipJob(job.ID) {
+		if js.shouldSkipJob(job.JobModel.ID) {
 			continue
 		}
 
 		// Enqueue the job
-		if err := js.jobCache.EnqueueJob(js.ctx, *job); err != nil {
-			logger.Error().Err(err).Msgf("Failed to enqueue job %s", job.ID)
+		if err := js.jobCache.EnqueueJob(js.ctx, job.JobModel); err != nil {
+			logger.Error().Err(err).Msgf("Failed to enqueue job %s", job.JobModel.ID)
 			continue
 		}
 
 		// Set job status to pending
-		if err := js.jobCache.SetJobStatus(js.ctx, job.ID, repository.CacheStatusPending, "Job enqueued for execution", 24*time.Hour); err != nil {
-			logger.Error().Err(err).Msgf("Failed to set job status for %s", job.ID)
+		if err := js.jobCache.SetJobStatus(js.ctx, job.JobModel.ID, repository.CacheStatusPending, "Job enqueued for execution", 24*time.Hour); err != nil {
+			logger.Error().Err(err).Msgf("Failed to set job status for %s", job.JobModel.ID)
 		}
-		logger.Info().Msgf("Enqueued job: %s", job.ID)
+		logger.Info().Msgf("Enqueued job: %s", job.JobModel.ID)
 	}
 }
 
@@ -207,6 +217,77 @@ func (js *JobScheduler) testExecuteJobLogic(job domain.JobModel) (bool, string) 
 	js.logger(js.ctx).Info().Msgf("Job %s executed successfully", job.ID)
 
 	return true, "Job executed successfully"
+}
+
+// fetchExecutionConfigsAndFilterJobs fetches execution configs in batch and filters jobs
+func (js *JobScheduler) fetchExecutionConfigsAndFilterJobs(jobs []*domain.JobModel) ([]CombinedJob, error) {
+	logger := js.logger(js.ctx).With().Str("function", "fetchExecutionConfigsAndFilterJobs").Logger()
+
+	// Fetch execution configs in batch
+	executionConfigs, err := js.blockchainService.GetExecutionConfigsBatch(js.ctx, jobs)
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to get execution configs in batch")
+		return nil, err
+	}
+
+	// Create CombinedJob structs and filter jobs that are ready to execute or completed
+	var jobsToExecute []CombinedJob
+	for _, jobModel := range jobs {
+		// Filter out jobs that are already in cache
+		if js.isJobInCache(jobModel.ID) {
+			logger.Debug().Str("job_id", jobModel.ID.String()).Msg("Job already in cache, skipping")
+			continue
+		}
+
+		config, exists := executionConfigs[jobModel.ID.String()]
+		if !exists {
+			logger.Warn().Str("job_id", jobModel.ID.String()).Msg("No execution config found for job")
+			continue
+		}
+
+		// Create CombinedJob struct
+		job := CombinedJob{
+			JobModel:        *jobModel,
+			ExecutionConfig: *config,
+		}
+
+		// Check if job has completed all executions
+		if config.NumberOfExecutionsCompleted >= config.NumberOfExecutions {
+			logger.Info().
+				Str("job_id", jobModel.ID.String()).
+				Uint16("completed", config.NumberOfExecutionsCompleted).
+				Uint16("total", config.NumberOfExecutions).
+				Msg("Job has completed all executions, marking as completed")
+
+			// Set job status to completed in cache
+			if err := js.jobCache.SetJobStatus(js.ctx, jobModel.ID, repository.CacheStatusCompleted, "All executions completed", 24*time.Hour); err != nil {
+				logger.Error().Err(err).Str("job_id", jobModel.ID.String()).Msg("Failed to set completed job status in cache")
+			}
+			continue
+		}
+
+		// Check if job is ready to execute
+		if config.IsTimeToExecute() {
+			jobsToExecute = append(jobsToExecute, job)
+		}
+	}
+
+	logger.Info().
+		Int("total_jobs", len(jobs)).
+		Int("jobs_with_configs", len(executionConfigs)).
+		Int("jobs_to_execute", len(jobsToExecute)).
+		Msg("Processed execution configs and filtered jobs")
+
+	return jobsToExecute, nil
+}
+
+// isJobInCache checks if a job exists in the Redis cache (regardless of status)
+func (js *JobScheduler) isJobInCache(jobID uuid.UUID) bool {
+	_, err := js.jobCache.GetJobStatus(js.ctx, jobID)
+	// If no error, job exists in cache
+	// If error is redis.Nil, job doesn't exist in cache
+	// If other error, assume job doesn't exist (conservative approach)
+	return err == nil
 }
 
 // groupJobsByChainID groups job caches by their chain ID for batch processing

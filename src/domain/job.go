@@ -76,9 +76,3 @@ func (ec *ExecutionConfig) IsTimeToExecute() bool {
 	// Check if current time is >= next execution time
 	return now.Cmp(nextExecutionTime) >= 0
 }
-
-// Job represents a job for use in the scheduler
-type Job struct {
-	JobModel
-	ExecutionConfig
-}
