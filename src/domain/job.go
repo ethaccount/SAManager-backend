@@ -18,6 +18,8 @@ type Job struct {
 	OnChainJobID      int64           `gorm:"not null" json:"onChainJobId"`
 	UserOperation     json.RawMessage `gorm:"type:jsonb;not null" json:"userOperation"`
 	EntryPointAddress string          `gorm:"type:varchar(42);not null" json:"entryPointAddress"`
+	Status            string          `gorm:"type:varchar(20);not null;default:queuing;check:status IN ('queuing', 'completed', 'failed')" json:"status"`
+	ErrMsg            *string         `gorm:"type:text" json:"errMsg,omitempty"`
 	CreatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP" json:"createdAt"`
 	UpdatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updatedAt"`
 }

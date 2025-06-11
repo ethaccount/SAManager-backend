@@ -1,3 +1,6 @@
+include .env
+export
+
 .PHONY: run # .PHONY is to make always executes the commands regardless of whether a file named "run" exists.
 run:
 	trap 'exit 0' INT; go run cmd/samanager/main.go
@@ -5,9 +8,11 @@ run:
 build:
 	go build -o bin/samanager cmd/samanager/main.go
 
-.PHONY: migrate
-migrate:
-	migrate -database $DB_URL -path migrations up
+migrate-up:
+	migrate -database $(DB_URL) -path migrations up
+
+migrate-down:
+	migrate -database $(DB_URL) -path migrations down
 
 db-up:
 	docker compose up -d
