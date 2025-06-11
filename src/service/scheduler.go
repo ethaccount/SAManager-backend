@@ -72,6 +72,9 @@ func (js *JobScheduler) Stop() {
 func (js *JobScheduler) pollJobs() {
 	defer js.wg.Done()
 
+	// Run immediately on startup
+	js.pollJobLogic()
+
 	ticker := time.NewTicker(time.Duration(js.pollingInterval) * time.Second)
 	defer ticker.Stop()
 
@@ -122,6 +125,7 @@ func (js *JobScheduler) processJobs() {
 // pollJobsLogic checks for jobs to execute and enqueues them
 func (js *JobScheduler) pollJobLogic() {
 	logger := js.logger(js.ctx).With().Str("function", "pollJobLogic").Logger()
+	logger.Info().Msg("Polling jobs...")
 
 	// Step 1: Process Pending Jobs: check receipt for pending jobs and update job cache
 	js.checkReceiptsForPendingJobs()
@@ -133,6 +137,11 @@ func (js *JobScheduler) pollJobLogic() {
 	jobs, err := js.jobService.GetActiveJobs(js.ctx)
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to get active jobs from job service")
+		return
+	}
+
+	if len(jobs) == 0 {
+		logger.Info().Msg("No active jobs found")
 		return
 	}
 
@@ -162,36 +171,27 @@ func (js *JobScheduler) pollJobLogic() {
 // executeJobLogic executes a single job and updates its status
 func (js *JobScheduler) executeJobLogic(job domain.JobModel) {
 	logger := js.logger(js.ctx).With().Str("function", "executeJobLogic").Logger()
-	logger.Info().Str("jobID", job.ID.String()).Msg("Executing job")
+	logger.Info().Str("jobID", job.ID.String()).Msg("Executing job...")
 
 	// Step 1: Execute Job
-
-	success, message := js.testExecuteJobLogic(job)
+	userOpHash, err := js.executionService.ExecuteJob(js.ctx, job)
 
 	// Step 2: Update Job Status
-	if success {
-		// Remove the job status from cache since execution was successful
+	if userOpHash != nil && err == nil {
+		// delete the job cache since execution was successful
 		if err := js.jobCache.DeleteJobCache(js.ctx, job.ID); err != nil {
 			logger.Error().Err(err).Msgf("Failed to delete job status for %s", job.ID)
 		}
-		logger.Info().Msgf("Job %s completed successfully", job.ID)
+		logger.Info().Msgf("Job %s completed successfully and deleted from cache", job.ID)
 		return
 	} else {
-		logger.Error().Msgf("Job %s failed: %s", job.ID, message)
+		errMsg := err.Error()
+		logger.Error().Msgf("Job %s failed: %s", job.ID, errMsg)
 		// Update job status in cache
-		if err := js.jobCache.SetJobStatus(js.ctx, job.ID, repository.CacheStatusFailed, &message); err != nil {
+		if err := js.jobCache.SetJobStatus(js.ctx, job.ID, repository.CacheStatusFailed, &errMsg); err != nil {
 			logger.Error().Err(err).Msgf("Failed to set failed job status for %s", job.ID)
 		}
 	}
-}
-
-// executeJobLogic simulates the actual job execution logic
-func (js *JobScheduler) testExecuteJobLogic(job domain.JobModel) (bool, string) {
-	// Simulate processing time
-	time.Sleep(time.Duration(100+job.ID[0]%5) * time.Millisecond)
-	js.logger(js.ctx).Info().Msgf("Job %s executed successfully", job.ID)
-
-	return true, "Job executed successfully"
 }
 
 // fetchExecutionConfigsAndFilterJobs fetches execution configs in batch and filters jobs

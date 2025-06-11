@@ -96,6 +96,7 @@ func main() {
 
 	// Execute the job
 	logger.Info().Str("job_id", JOB_ID).Msg("Executing job")
+
 	userOpHash, err := executionService.ExecuteJob(ctx, *job)
 	if err != nil {
 		logger.Fatal().Err(err).Str("job_id", JOB_ID).Msg("Failed to execute job")
@@ -103,11 +104,11 @@ func main() {
 
 	logger.Info().
 		Str("job_id", JOB_ID).
-		Str("user_op_hash", userOpHash).
+		Str("user_op_hash", userOpHash.Hex()).
 		Msg("Job executed successfully")
 
 	// Wait for user operation receipt using blockchain service
-	logger.Info().Str("user_op_hash", userOpHash).Msg("Waiting for user operation receipt...")
+	logger.Info().Str("user_op_hash", userOpHash.Hex()).Msg("Waiting for user operation receipt...")
 	maxAttempts := 60
 	pollInterval := 2 * time.Second
 
@@ -119,10 +120,10 @@ func main() {
 			Msg("Failed to get bundler client")
 	}
 
-	receipt, err := bundlerClient.(*erc4337.BundlerClient).WaitForUserOpReceipt(ctx, userOpHash, maxAttempts, pollInterval)
+	receipt, err := bundlerClient.(*erc4337.BundlerClient).WaitForUserOpReceipt(ctx, *userOpHash, maxAttempts, pollInterval)
 	if err != nil {
 		logger.Fatal().Err(err).
-			Str("user_op_hash", userOpHash).
+			Str("user_op_hash", userOpHash.Hex()).
 			Int("max_attempts", maxAttempts).
 			Msg("Failed to get user operation receipt")
 	}

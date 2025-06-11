@@ -34,6 +34,10 @@ type JobModel struct {
 	UpdatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updatedAt"`
 }
 
+func (JobModel) TableName() string {
+	return "jobs"
+}
+
 // GetUserOperation returns the user operation as a typed struct
 func (j *JobModel) GetUserOperation() (*erc4337.UserOperation, error) {
 	var userOp erc4337.UserOperation

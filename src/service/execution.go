@@ -161,7 +161,7 @@ func getMaxFeePerGas(ctx context.Context, rpcClient *rpc.Client) (*big.Int, *big
 }
 
 // ExecuteJob signs the user operation and sends it to the bundler
-func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) (string, error) {
+func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) (*common.Hash, error) {
 	s.logger(ctx).Info().
 		Str("job_id", job.ID.String()).
 		Str("account_address", job.AccountAddress.Hex()).
@@ -175,7 +175,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", job.ID.String()).
 			Msg("failed to get user operation from job")
-		return "", fmt.Errorf("failed to get user operation: %w", err)
+		return nil, fmt.Errorf("failed to get user operation: %w", err)
 	}
 
 	// Get bundler client
@@ -185,7 +185,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 			Str("job_id", job.ID.String()).
 			Int64("chain_id", job.ChainID).
 			Msg("failed to get bundler client")
-		return "", fmt.Errorf("failed to get bundler client: %w", err)
+		return nil, fmt.Errorf("failed to get bundler client: %w", err)
 	}
 
 	// Get bundler URL for RPC client
@@ -195,7 +195,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 			Str("job_id", job.ID.String()).
 			Int64("chain_id", job.ChainID).
 			Msg("failed to get bundler URL")
-		return "", fmt.Errorf("failed to get bundler URL: %w", err)
+		return nil, fmt.Errorf("failed to get bundler URL: %w", err)
 	}
 
 	// Create RPC client for direct blockchain calls
@@ -205,7 +205,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 			Str("job_id", job.ID.String()).
 			Str("bundler_url", bundlerURL).
 			Msg("failed to create RPC client")
-		return "", fmt.Errorf("failed to create RPC client: %w", err)
+		return nil, fmt.Errorf("failed to create RPC client: %w", err)
 	}
 	defer rpcClient.Close()
 
@@ -215,7 +215,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", job.ID.String()).
 			Msg("failed to extract nonce key")
-		return "", fmt.Errorf("failed to extract nonce key: %w", err)
+		return nil, fmt.Errorf("failed to extract nonce key: %w", err)
 	}
 
 	s.logger(ctx).Debug().
@@ -228,7 +228,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", job.ID.String()).
 			Msg("failed to get current nonce")
-		return "", fmt.Errorf("failed to get current nonce: %w", err)
+		return nil, fmt.Errorf("failed to get current nonce: %w", err)
 	}
 
 	s.logger(ctx).Debug().
@@ -250,7 +250,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", job.ID.String()).
 			Msg("failed to decode dummy signature")
-		return "", fmt.Errorf("failed to decode dummy signature: %w", err)
+		return nil, fmt.Errorf("failed to decode dummy signature: %w", err)
 	}
 
 	leadingSignature := userOp.Signature
@@ -263,7 +263,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", job.ID.String()).
 			Msg("failed to estimate user operation gas")
-		return "", fmt.Errorf("failed to estimate user operation gas: %w", err)
+		return nil, fmt.Errorf("failed to estimate user operation gas: %w", err)
 	}
 
 	// Get gas fees
@@ -272,7 +272,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", job.ID.String()).
 			Msg("failed to get gas fees")
-		return "", fmt.Errorf("failed to get gas fees: %w", err)
+		return nil, fmt.Errorf("failed to get gas fees: %w", err)
 	}
 
 	s.logger(ctx).Debug().
@@ -299,7 +299,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 			Str("job_id", job.ID.String()).
 			Interface("user_op", userOp).
 			Msg("failed to calculate user operation hash")
-		return "", fmt.Errorf("failed to calculate user operation hash: %w", err)
+		return nil, fmt.Errorf("failed to calculate user operation hash: %w", err)
 	}
 
 	s.logger(ctx).Debug().
@@ -321,7 +321,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 			Str("job_id", job.ID.String()).
 			Interface("user_op", userOp).
 			Msg("failed to sign user operation hash")
-		return "", fmt.Errorf("failed to sign user operation hash: %w", err)
+		return nil, fmt.Errorf("failed to sign user operation hash: %w", err)
 	}
 
 	// Adjust signature format for Ethereum (recovery ID + 27)
@@ -347,7 +347,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 			Str("job_id", job.ID.String()).
 			Interface("user_op", userOp).
 			Msg("failed to send user operation")
-		return "", fmt.Errorf("failed to send user operation: %w", err)
+		return nil, fmt.Errorf("failed to send user operation: %w", err)
 	}
 
 	s.logger(ctx).Info().
@@ -355,5 +355,5 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) 
 		Str("user_op_hash", userOpHash.Hex()).
 		Msg("job executed successfully")
 
-	return userOpHash.Hex(), nil
+	return &userOpHash, nil
 }

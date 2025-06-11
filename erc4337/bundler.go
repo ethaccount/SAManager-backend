@@ -127,13 +127,10 @@ func (b *BundlerClient) GetUserOperationReceipt(ctx context.Context, userOpHash 
 }
 
 // WaitForUserOpReceipt polls for user operation receipt with retry logic
-func (b *BundlerClient) WaitForUserOpReceipt(ctx context.Context, userOpHash string, maxAttempts int, pollInterval time.Duration) (*UserOperationReceipt, error) {
-	// Convert userOpHash string to common.Hash once
-	userOpHashHex := common.HexToHash(userOpHash)
-
+func (b *BundlerClient) WaitForUserOpReceipt(ctx context.Context, userOpHash common.Hash, maxAttempts int, pollInterval time.Duration) (*UserOperationReceipt, error) {
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		// Get user operation receipt from bundler client
-		receipt, err := b.GetUserOperationReceipt(ctx, userOpHashHex)
+		receipt, err := b.GetUserOperationReceipt(ctx, userOpHash)
 		if err != nil || receipt == nil {
 			// Receipt not yet available, continue polling if not last attempt
 			if attempt == maxAttempts {
