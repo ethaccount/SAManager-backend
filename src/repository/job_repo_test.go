@@ -21,10 +21,10 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	repo := NewJobRepository(db)
 
 	// Test data
-	accountAddress := "0x1234567890123456789012345678901234567890"
+	accountAddress := common.HexToAddress("0x1234567890123456789012345678901234567890")
 	chainId := int64(1) // Ethereum mainnet
 	jobID := int64(12345)
-	entryPointAddress := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+	entryPointAddress := common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032")
 
 	userOperation := &erc4337.UserOperation{
 		Sender:               common.HexToAddress("0x1234567890123456789012345678901234567890"),
@@ -54,7 +54,7 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	}
 
 	if job.AccountAddress != accountAddress {
-		t.Errorf("Expected accountAddress %s, got %s", accountAddress, job.AccountAddress)
+		t.Errorf("Expected accountAddress %s, got %s", accountAddress.Hex(), job.AccountAddress.Hex())
 	}
 
 	if job.OnChainJobID != jobID {
@@ -66,7 +66,7 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	}
 
 	if job.EntryPointAddress != entryPointAddress {
-		t.Errorf("Expected EntryPointAddress %s, got %s", entryPointAddress, job.EntryPointAddress)
+		t.Errorf("Expected EntryPointAddress %s, got %s", entryPointAddress.Hex(), job.EntryPointAddress.Hex())
 	}
 
 	if job.CreatedAt.IsZero() {
@@ -98,7 +98,7 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	}
 
 	if dbJob.AccountAddress != accountAddress {
-		t.Errorf("Database job accountAddress mismatch: expected %s, got %s", accountAddress, dbJob.AccountAddress)
+		t.Errorf("Database job accountAddress mismatch: expected %s, got %s", accountAddress.Hex(), dbJob.AccountAddress.Hex())
 	}
 
 	if dbJob.OnChainJobID != jobID {
@@ -122,10 +122,10 @@ func TestJobRepository_RegisterJob_DuplicateJobID(t *testing.T) {
 
 	repo := NewJobRepository(db)
 
-	accountAddress := "0x1234567890123456789012345678901234567890"
+	accountAddress := common.HexToAddress("0x1234567890123456789012345678901234567890")
 	chainId := int64(1) // Ethereum mainnet
 	jobID := int64(12345)
-	entryPointAddress := "0x0000000071727De22E5E9d8BAf0edAc6f37da032"
+	entryPointAddress := common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032")
 
 	userOperation := &erc4337.UserOperation{
 		Sender:    common.HexToAddress("0x1234567890123456789012345678901234567890"),

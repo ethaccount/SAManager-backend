@@ -79,7 +79,7 @@ func (b *BlockchainService) GetClient(chainId int64) (*ethclient.Client, error) 
 
 func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.Job) (*domain.ExecutionConfig, error) {
 	b.logger(ctx).Debug().
-		Str("account_address", job.AccountAddress).
+		Str("account_address", job.AccountAddress.Hex()).
 		Int64("chain_id", job.ChainID).
 		Int64("job_id", int64(job.OnChainJobID)).
 		Msg("getting execution config for job")
@@ -97,11 +97,11 @@ func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.
 
 	parsedABI, _ := abi.JSON(strings.NewReader(contractABI))
 
-	calldata, err := parsedABI.Pack("executionLog", common.HexToAddress(job.AccountAddress), big.NewInt(int64(job.OnChainJobID)))
+	calldata, err := parsedABI.Pack("executionLog", job.AccountAddress, big.NewInt(int64(job.OnChainJobID)))
 
 	if err != nil {
 		b.logger(ctx).Error().Err(err).
-			Str("account_address", job.AccountAddress).
+			Str("account_address", job.AccountAddress.Hex()).
 			Int64("job_id", int64(job.OnChainJobID)).
 			Msg("failed to pack contract call data")
 		return nil, err
@@ -116,7 +116,7 @@ func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.
 	if err != nil {
 		b.logger(ctx).Error().Err(err).
 			Str("contract_address", scheduledTransfersAddress).
-			Str("account_address", job.AccountAddress).
+			Str("account_address", job.AccountAddress.Hex()).
 			Int64("job_id", int64(job.OnChainJobID)).
 			Msg("failed to call contract")
 		return nil, err
@@ -126,7 +126,7 @@ func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.
 	unpacked, err := parsedABI.Unpack("executionLog", result)
 	if err != nil {
 		b.logger(ctx).Error().Err(err).
-			Str("account_address", job.AccountAddress).
+			Str("account_address", job.AccountAddress.Hex()).
 			Int64("job_id", int64(job.OnChainJobID)).
 			Msg("failed to unpack contract result")
 		return nil, err
@@ -143,7 +143,7 @@ func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.
 	}
 
 	b.logger(ctx).Debug().
-		Str("account_address", job.AccountAddress).
+		Str("account_address", job.AccountAddress.Hex()).
 		Int64("job_id", int64(job.OnChainJobID)).
 		Bool("is_enabled", config.IsEnabled).
 		Uint16("executions_completed", config.NumberOfExecutionsCompleted).
@@ -201,11 +201,11 @@ func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs [
 		jobKeys := make([]string, len(chainJobs))
 
 		for i, job := range chainJobs {
-			calldata, err := parsedABI.Pack("executionLog", common.HexToAddress(job.AccountAddress), big.NewInt(int64(job.OnChainJobID)))
+			calldata, err := parsedABI.Pack("executionLog", job.AccountAddress, big.NewInt(int64(job.OnChainJobID)))
 			if err != nil {
 				b.logger(ctx).Error().Err(err).
 					Str("job_id", job.ID.String()).
-					Str("account_address", job.AccountAddress).
+					Str("account_address", job.AccountAddress.Hex()).
 					Msg("failed to pack calldata for job")
 				return nil, fmt.Errorf("failed to pack calldata for job %s: %w", job.ID.String(), err)
 			}

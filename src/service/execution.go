@@ -164,7 +164,7 @@ func getMaxFeePerGas(ctx context.Context, rpcClient *rpc.Client) (*big.Int, *big
 func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.Job) (string, error) {
 	s.logger(ctx).Info().
 		Str("job_id", job.ID.String()).
-		Str("account_address", job.AccountAddress).
+		Str("account_address", job.AccountAddress.Hex()).
 		Int64("chain_id", job.ChainID).
 		Int64("on_chain_job_id", job.OnChainJobID).
 		Msg("executing job")
@@ -257,7 +257,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.Job) (stri
 	userOp.Signature = append(userOp.Signature, decodedDummySignature...)
 
 	// Estimate gas values
-	entryPointAddress := common.HexToAddress(job.EntryPointAddress)
+	entryPointAddress := job.EntryPointAddress
 	estimates, err := bundlerClient.EstimateUserOperationGas(ctx, userOp, entryPointAddress)
 	if err != nil {
 		s.logger(ctx).Error().Err(err).

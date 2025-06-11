@@ -7,17 +7,18 @@ import (
 	"time"
 
 	"github.com/ethaccount/backend/erc4337"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 )
 
 // Job represents a job mapping in the scheduling system
 type Job struct {
 	ID                uuid.UUID       `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	AccountAddress    string          `gorm:"type:varchar(42);not null" json:"accountAddress"`
+	AccountAddress    common.Address  `gorm:"type:varchar(42);not null" json:"accountAddress"`
 	ChainID           int64           `gorm:"not null" json:"chainId"`
 	OnChainJobID      int64           `gorm:"not null" json:"onChainJobId"`
 	UserOperation     json.RawMessage `gorm:"type:jsonb;not null" json:"userOperation"`
-	EntryPointAddress string          `gorm:"type:varchar(42);not null" json:"entryPointAddress"`
+	EntryPointAddress common.Address  `gorm:"type:varchar(42);not null" json:"entryPointAddress"`
 	Status            string          `gorm:"type:varchar(20);not null;default:queuing;check:status IN ('queuing', 'completed', 'failed')" json:"status"`
 	ErrMsg            *string         `gorm:"type:text" json:"errMsg,omitempty"`
 	CreatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP" json:"createdAt"`

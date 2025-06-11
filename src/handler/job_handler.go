@@ -9,6 +9,7 @@ import (
 	"github.com/ethaccount/backend/erc4337"
 	"github.com/ethaccount/backend/src/domain"
 	"github.com/ethaccount/backend/src/service"
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
@@ -68,11 +69,11 @@ type JobResponse struct {
 func toJobResponse(job *domain.Job) JobResponse {
 	return JobResponse{
 		ID:                job.ID.String(),
-		AccountAddress:    job.AccountAddress,
+		AccountAddress:    job.AccountAddress.Hex(),
 		ChainID:           job.ChainID,
 		OnChainJobID:      job.OnChainJobID,
 		UserOperation:     job.UserOperation,
-		EntryPointAddress: job.EntryPointAddress,
+		EntryPointAddress: job.EntryPointAddress.Hex(),
 		CreatedAt:         job.CreatedAt.Format(TimeFormat),
 		UpdatedAt:         job.UpdatedAt.Format(TimeFormat),
 	}
@@ -106,13 +107,29 @@ func (h *JobHandler) RegisterJob(c *gin.Context) {
 		return
 	}
 
+	// Validate and parse addresses
+	if !common.IsHexAddress(req.AccountAddress) {
+		logger.Error().Str("accountAddress", req.AccountAddress).Msg("invalid account address format")
+		respondWithError(c, domain.NewError(domain.ErrorCodeParameterInvalid, errors.New("invalid account address format"), domain.WithMsg("accountAddress must be a valid hex address")))
+		return
+	}
+
+	if !common.IsHexAddress(req.EntryPoint) {
+		logger.Error().Str("entryPoint", req.EntryPoint).Msg("invalid entry point address format")
+		respondWithError(c, domain.NewError(domain.ErrorCodeParameterInvalid, errors.New("invalid entry point address format"), domain.WithMsg("entryPoint must be a valid hex address")))
+		return
+	}
+
+	accountAddress := common.HexToAddress(req.AccountAddress)
+	entryPointAddress := common.HexToAddress(req.EntryPoint)
+
 	job, err := h.jobService.RegisterJob(
 		c.Request.Context(),
-		req.AccountAddress,
+		accountAddress,
 		req.ChainID,
 		req.JobID,
 		req.UserOperation,
-		req.EntryPoint,
+		entryPointAddress,
 	)
 	if err != nil {
 		respondWithError(c, err)
@@ -121,10 +138,10 @@ func (h *JobHandler) RegisterJob(c *gin.Context) {
 
 	response := RegisterJobResponse{
 		JobUUID:        job.ID.String(),
-		AccountAddress: job.AccountAddress,
+		AccountAddress: job.AccountAddress.Hex(),
 		ChainID:        job.ChainID,
 		JobID:          job.OnChainJobID,
-		EntryPoint:     job.EntryPointAddress,
+		EntryPoint:     job.EntryPointAddress.Hex(),
 		CreatedAt:      job.CreatedAt.Format(TimeFormat),
 		UpdatedAt:      job.UpdatedAt.Format(TimeFormat),
 		Message:        "Job registered successfully",

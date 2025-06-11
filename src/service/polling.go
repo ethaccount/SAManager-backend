@@ -96,7 +96,7 @@ func (s *PollingService) poll(ctx context.Context) error {
 			overdueJobs++
 			s.logger(ctx).Info().
 				Str("job_id", job.ID.String()).
-				Str("account_address", job.AccountAddress).
+				Str("account_address", job.AccountAddress.Hex()).
 				Int64("on_chain_job_id", job.OnChainJobID).
 				Int64("chain_id", job.ChainID).
 				Msg("job is overdue for execution")

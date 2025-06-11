@@ -6,6 +6,7 @@ import (
 	"github.com/ethaccount/backend/erc4337"
 	"github.com/ethaccount/backend/src/domain"
 	"github.com/ethaccount/backend/src/repository"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
 )
 
@@ -26,10 +27,10 @@ func (s *JobService) logger(ctx context.Context) *zerolog.Logger {
 }
 
 // RegisterJob creates a new job registration
-func (s *JobService) RegisterJob(ctx context.Context, accountAddress string, chainId int64, jobID int64, userOperation *erc4337.UserOperation, entryPoint string) (*domain.Job, error) {
+func (s *JobService) RegisterJob(ctx context.Context, accountAddress common.Address, chainId int64, jobID int64, userOperation *erc4337.UserOperation, entryPoint common.Address) (*domain.Job, error) {
 	s.logger(ctx).Info().
 		Str("function", "RegisterJob").
-		Str("accountAddress", accountAddress).
+		Str("accountAddress", accountAddress.Hex()).
 		Int64("chainId", chainId).
 		Int64("onChainJobId", jobID).
 		Msg("Registering new job")
@@ -41,7 +42,7 @@ func (s *JobService) RegisterJob(ctx context.Context, accountAddress string, cha
 
 	s.logger(ctx).Info().
 		Str("id", job.ID.String()).
-		Str("accountAddress", accountAddress).
+		Str("accountAddress", accountAddress.Hex()).
 		Int64("chainId", chainId).
 		Int64("onChainJobId", jobID).
 		Msg("Successfully registered job")
