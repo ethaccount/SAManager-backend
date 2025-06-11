@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ethaccount/backend/src/domain"
@@ -36,6 +37,7 @@ type JobCacheRepository struct {
 	redis       *redis.Client
 	queueName   string
 	statusCache string
+	mu          sync.RWMutex // Add mutex for thread-safe operations
 }
 
 // NewJobCacheRepository creates a new job cache repository instance
@@ -74,6 +76,9 @@ func (r *JobCacheRepository) DequeueJob(ctx context.Context, timeout time.Durati
 
 // GetJobStatus retrieves the job status from Redis cache
 func (r *JobCacheRepository) GetJobStatus(ctx context.Context, jobID uuid.UUID) (*JobCache, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	statusKey := fmt.Sprintf("%s:%s", r.statusCache, jobID)
 	statusData, err := r.redis.Get(ctx, statusKey).Result()
 	if err != nil {
@@ -90,12 +95,19 @@ func (r *JobCacheRepository) GetJobStatus(ctx context.Context, jobID uuid.UUID) 
 
 // SetJobStatus updates the job status in Redis cache with 24-hour expiration
 func (r *JobCacheRepository) SetJobStatus(ctx context.Context, jobID uuid.UUID, status CacheJobStatus, message *string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	statusKey := fmt.Sprintf("%s:%s", r.statusCache, jobID)
 	result := JobCache{
 		JobID:     jobID,
 		Status:    status,
-		Error:     *message,
 		UpdatedAt: time.Now(),
+	}
+
+	// Handle nil message pointer safely
+	if message != nil {
+		result.Error = *message
 	}
 
 	resultData, err := json.Marshal(result)
@@ -108,12 +120,18 @@ func (r *JobCacheRepository) SetJobStatus(ctx context.Context, jobID uuid.UUID, 
 
 // DeleteJobCache removes the JobCache by jobID from Redis
 func (r *JobCacheRepository) DeleteJobCache(ctx context.Context, jobID uuid.UUID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	statusKey := fmt.Sprintf("%s:%s", r.statusCache, jobID)
 	return r.redis.Del(ctx, statusKey).Err()
 }
 
 // AddJobCache stores a complete JobCache object in Redis with 24-hour expiration
 func (r *JobCacheRepository) AddJobCache(ctx context.Context, jobCache *JobCache) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	statusKey := fmt.Sprintf("%s:%s", r.statusCache, jobCache.JobID)
 
 	// Update the timestamp
@@ -130,13 +148,25 @@ func (r *JobCacheRepository) AddJobCache(ctx context.Context, jobCache *JobCache
 
 // GetAllStatusKeys retrieves all status keys matching the pattern
 func (r *JobCacheRepository) GetAllStatusKeys(ctx context.Context) ([]string, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	pattern := fmt.Sprintf("%s:*", r.statusCache)
+	return r.redis.Keys(ctx, pattern).Result()
+}
+
+// getAllStatusKeysInternal retrieves all status keys matching the pattern (internal method without lock)
+func (r *JobCacheRepository) getAllStatusKeysInternal(ctx context.Context) ([]string, error) {
 	pattern := fmt.Sprintf("%s:*", r.statusCache)
 	return r.redis.Keys(ctx, pattern).Result()
 }
 
 // GetJobCachesByStatus retrieves all job caches with the specified status
 func (r *JobCacheRepository) GetJobCachesByStatus(ctx context.Context, status CacheJobStatus) ([]*JobCache, error) {
-	keys, err := r.GetAllStatusKeys(ctx)
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	keys, err := r.getAllStatusKeysInternal(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get status keys: %w", err)
 	}
