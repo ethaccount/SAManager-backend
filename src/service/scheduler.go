@@ -143,14 +143,8 @@ func (js *JobScheduler) pollJobLogic() {
 		return
 	}
 
-	// Step 5: Enqueue Overdue Jobs
-
+	// Step 5: Enqueue jobs and update job cache status
 	for _, job := range jobsToExecute {
-		// Check if job should be skipped based on status in cache
-		if js.shouldSkipJob(job.JobModel.ID) {
-			continue
-		}
-
 		// Enqueue the job
 		if err := js.jobCache.EnqueueJob(js.ctx, job.JobModel); err != nil {
 			logger.Error().Err(err).Msgf("Failed to enqueue job %s", job.JobModel.ID)
@@ -158,29 +152,11 @@ func (js *JobScheduler) pollJobLogic() {
 		}
 
 		// Set job status to pending
-		if err := js.jobCache.SetJobStatus(js.ctx, job.JobModel.ID, repository.CacheStatusPending, "Job enqueued for execution", 24*time.Hour); err != nil {
+		if err := js.jobCache.SetJobStatus(js.ctx, job.JobModel.ID, repository.CacheStatusPending, nil); err != nil {
 			logger.Error().Err(err).Msgf("Failed to set job status for %s", job.JobModel.ID)
 		}
 		logger.Info().Msgf("Enqueued job: %s", job.JobModel.ID)
 	}
-}
-
-// shouldSkipJob checks if a job should be skipped based on its current status in Redis cache
-func (js *JobScheduler) shouldSkipJob(jobID uuid.UUID) bool {
-	logger := js.logger(js.ctx).With().Str("function", "shouldSkipJob").Logger()
-
-	result, err := js.jobCache.GetJobStatus(js.ctx, jobID)
-	if err != nil {
-		if err == redis.Nil {
-			// No status found, job can be processed
-			return false
-		}
-		logger.Error().Err(err).Msgf("Error checking job status for %s", jobID)
-		return false
-	}
-
-	// Skip if status is pending
-	return result.Status == repository.CacheStatusPending
 }
 
 // executeJobLogic executes a single job and updates its status
@@ -193,7 +169,6 @@ func (js *JobScheduler) executeJobLogic(job domain.JobModel) {
 	success, message := js.testExecuteJobLogic(job)
 
 	// Step 2: Update Job Status
-
 	if success {
 		// Remove the job status from cache since execution was successful
 		if err := js.jobCache.DeleteJobCache(js.ctx, job.ID); err != nil {
@@ -204,7 +179,7 @@ func (js *JobScheduler) executeJobLogic(job domain.JobModel) {
 	} else {
 		logger.Error().Msgf("Job %s failed: %s", job.ID, message)
 		// Update job status in cache
-		if err := js.jobCache.SetJobStatus(js.ctx, job.ID, repository.CacheStatusFailed, message, 24*time.Hour); err != nil {
+		if err := js.jobCache.SetJobStatus(js.ctx, job.ID, repository.CacheStatusFailed, &message); err != nil {
 			logger.Error().Err(err).Msgf("Failed to set failed job status for %s", job.ID)
 		}
 	}
@@ -260,7 +235,7 @@ func (js *JobScheduler) fetchExecutionConfigsAndFilterJobs(jobs []*domain.JobMod
 				Msg("Job has completed all executions, marking as completed")
 
 			// Set job status to completed in cache
-			if err := js.jobCache.SetJobStatus(js.ctx, jobModel.ID, repository.CacheStatusCompleted, "All executions completed", 24*time.Hour); err != nil {
+			if err := js.jobCache.SetJobStatus(js.ctx, jobModel.ID, repository.CacheStatusCompleted, nil); err != nil {
 				logger.Error().Err(err).Str("job_id", jobModel.ID.String()).Msg("Failed to set completed job status in cache")
 			}
 			continue
@@ -494,7 +469,7 @@ func (js *JobScheduler) checkSingleJobReceipt(bundlerClient interface{}, job *re
 	} else {
 		// Job failed, update status
 		errorMsg := "User operation failed on-chain"
-		if err := js.jobCache.SetJobStatus(js.ctx, job.JobID, repository.CacheStatusFailed, errorMsg, 24*time.Hour); err != nil {
+		if err := js.jobCache.SetJobStatus(js.ctx, job.JobID, repository.CacheStatusFailed, &errorMsg); err != nil {
 			logger.Error().Err(err).
 				Str("job_id", job.JobID.String()).
 				Msg("Failed to update failed job status in cache")

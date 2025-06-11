@@ -88,13 +88,13 @@ func (r *JobCacheRepository) GetJobStatus(ctx context.Context, jobID uuid.UUID) 
 	return &result, nil
 }
 
-// SetJobStatus updates the job status in Redis cache with expiration
-func (r *JobCacheRepository) SetJobStatus(ctx context.Context, jobID uuid.UUID, status CacheJobStatus, message string, expiration time.Duration) error {
+// SetJobStatus updates the job status in Redis cache with 24-hour expiration
+func (r *JobCacheRepository) SetJobStatus(ctx context.Context, jobID uuid.UUID, status CacheJobStatus, message *string) error {
 	statusKey := fmt.Sprintf("%s:%s", r.statusCache, jobID)
 	result := JobCache{
 		JobID:     jobID,
 		Status:    status,
-		Error:     message,
+		Error:     *message,
 		UpdatedAt: time.Now(),
 	}
 
@@ -103,7 +103,7 @@ func (r *JobCacheRepository) SetJobStatus(ctx context.Context, jobID uuid.UUID, 
 		return fmt.Errorf("failed to marshal job result: %w", err)
 	}
 
-	return r.redis.Set(ctx, statusKey, resultData, expiration).Err()
+	return r.redis.Set(ctx, statusKey, resultData, 24*time.Hour).Err()
 }
 
 // DeleteJobCache removes the JobCache by jobID from Redis
