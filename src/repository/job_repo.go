@@ -59,8 +59,27 @@ func (r *JobRepository) FindJobById(id string) (*domain.JobModel, error) {
 // FindActiveJobs retrieves all jobs with "queuing" status from the database
 func (r *JobRepository) FindActiveJobs() ([]*domain.JobModel, error) {
 	var jobs []*domain.JobModel
-	if err := r.db.Where("status = ?", "queuing").Find(&jobs).Error; err != nil {
+	if err := r.db.Where("status = ?", domain.DBJobStatusQueuing).Find(&jobs).Error; err != nil {
 		return nil, err
 	}
 	return jobs, nil
+}
+
+// UpdateJobStatus updates the status of a job by its ID
+// If status is "failed", errMsg can be provided to set the error message
+func (r *JobRepository) UpdateJobStatus(id string, status domain.DBJobStatus, errMsg *string) error {
+	updates := map[string]interface{}{
+		"status": status,
+	}
+
+	// If status is failed and errMsg is provided, include it in the update
+	if status == domain.DBJobStatusFailed && errMsg != nil {
+		updates["err_msg"] = *errMsg
+	}
+
+	if err := r.db.Model(&domain.JobModel{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		return err
+	}
+
+	return nil
 }

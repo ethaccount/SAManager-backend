@@ -11,6 +11,15 @@ import (
 	"github.com/google/uuid"
 )
 
+// DBJobStatus represents the status of a job in the database
+type DBJobStatus string
+
+const (
+	DBJobStatusQueuing   DBJobStatus = "queuing"
+	DBJobStatusCompleted DBJobStatus = "completed"
+	DBJobStatusFailed    DBJobStatus = "failed"
+)
+
 // JobModel represents a job in the database
 type JobModel struct {
 	ID                uuid.UUID       `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
@@ -19,7 +28,7 @@ type JobModel struct {
 	OnChainJobID      int64           `gorm:"not null" json:"onChainJobId"`
 	UserOperation     json.RawMessage `gorm:"type:jsonb;not null" json:"userOperation"`
 	EntryPointAddress common.Address  `gorm:"type:varchar(42);not null" json:"entryPointAddress"`
-	Status            string          `gorm:"type:varchar(20);not null;default:queuing;check:status IN ('queuing', 'completed', 'failed')" json:"status"`
+	Status            DBJobStatus     `gorm:"type:varchar(20);not null;default:queuing;check:status IN ('queuing', 'completed', 'failed')" json:"status"`
 	ErrMsg            *string         `gorm:"type:text" json:"errMsg,omitempty"`
 	CreatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP" json:"createdAt"`
 	UpdatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updatedAt"`

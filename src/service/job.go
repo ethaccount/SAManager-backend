@@ -84,3 +84,27 @@ func (s *JobService) GetJobByID(ctx context.Context, id string) (*domain.JobMode
 		Msg("successfully retrieved job")
 	return job, nil
 }
+
+// UpdateJobStatus updates the status of a job by its ID
+func (s *JobService) UpdateJobStatus(ctx context.Context, id string, status domain.DBJobStatus, errMsg *string) error {
+	s.logger(ctx).Debug().
+		Str("function", "UpdateJobStatus").
+		Str("job_id", id).
+		Str("status", string(status)).
+		Msg("updating job status")
+
+	err := s.jobRepo.UpdateJobStatus(id, status, errMsg)
+	if err != nil {
+		s.logger(ctx).Error().Err(err).
+			Str("job_id", id).
+			Str("status", string(status)).
+			Msg("failed to update job status in repository")
+		return err
+	}
+
+	s.logger(ctx).Info().
+		Str("job_id", id).
+		Str("status", string(status)).
+		Msg("successfully updated job status")
+	return nil
+}
