@@ -62,7 +62,7 @@ func (s *PollingService) poll(ctx context.Context) error {
 	s.logger(ctx).Debug().Msg("starting polling cycle")
 
 	// Get all registered jobs
-	jobs, err := s.jobService.GetAllActiveJobs(ctx)
+	jobs, err := s.jobService.GetActiveJobs(ctx)
 	if err != nil {
 		return err
 	}

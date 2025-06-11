@@ -169,7 +169,7 @@ func (h *JobHandler) RegisterJob(c *gin.Context) {
 func (h *JobHandler) GetJobList(c *gin.Context) {
 	logger := h.logger(c.Request.Context()).With().Str("function", "GetJobList").Logger()
 
-	jobs, err := h.jobService.GetAllActiveJobs(c.Request.Context())
+	jobs, err := h.jobService.GetActiveJobs(c.Request.Context())
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to retrieve jobs")
 		respondWithError(c, err)

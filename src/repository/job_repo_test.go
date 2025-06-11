@@ -38,15 +38,15 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 		Signature:            hexutil.Bytes([]byte{0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf}),
 	}
 
-	// Test RegisterJob
-	job, err := repo.RegisterJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
+	// Test CreateJob
+	job, err := repo.CreateJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
 	if err != nil {
-		t.Fatalf("RegisterJob failed: %v", err)
+		t.Fatalf("CreateJob failed: %v", err)
 	}
 
 	// Verify the returned job
 	if job == nil {
-		t.Fatal("RegisterJob returned nil job")
+		t.Fatal("CreateJob returned nil job")
 	}
 
 	if job.ID == uuid.Nil {
@@ -135,13 +135,13 @@ func TestJobRepository_RegisterJob_DuplicateJobID(t *testing.T) {
 	}
 
 	// Register first job
-	_, err := repo.RegisterJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
+	_, err := repo.CreateJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
 	if err != nil {
-		t.Fatalf("First RegisterJob failed: %v", err)
+		t.Fatalf("First CreateJob failed: %v", err)
 	}
 
 	// Try to register duplicate job (same account_address and job_id)
-	_, err = repo.RegisterJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
+	_, err = repo.CreateJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
 	if err == nil {
 		t.Error("Expected error when registering duplicate job, but got none")
 	}

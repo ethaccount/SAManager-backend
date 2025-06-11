@@ -95,7 +95,7 @@ func (js *JobScheduler) pollJobs() {
 // checkAndEnqueueJobs finds jobs that need to be executed and enqueues them
 func (js *JobScheduler) checkAndEnqueueJobs() {
 	logger := zerolog.Ctx(js.ctx).With().Str("function", "checkAndEnqueueJobs").Logger()
-	jobsToCheck, err := js.jobService.GetAllActiveJobs(js.ctx)
+	jobsToCheck, err := js.jobService.GetActiveJobs(js.ctx)
 	if err != nil {
 		zerolog.Ctx(js.ctx).Error().Err(err).Str("function", "checkAndEnqueueJobs").Msg("Failed to get jobs to check")
 		return

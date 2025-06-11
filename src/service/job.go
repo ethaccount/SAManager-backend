@@ -35,7 +35,7 @@ func (s *JobService) RegisterJob(ctx context.Context, accountAddress common.Addr
 		Int64("onChainJobId", jobID).
 		Msg("Registering new job")
 
-	job, err := s.jobRepo.RegisterJob(accountAddress, chainId, jobID, userOperation, entryPoint)
+	job, err := s.jobRepo.CreateJob(accountAddress, chainId, jobID, userOperation, entryPoint)
 	if err != nil {
 		return nil, err
 	}
@@ -50,12 +50,11 @@ func (s *JobService) RegisterJob(ctx context.Context, accountAddress common.Addr
 	return job, nil
 }
 
-// GetAllActiveJobs retrieves all jobs that are available for polling
-// Currently delegates to repository, but provides a place for future business logic
-func (s *JobService) GetAllActiveJobs(ctx context.Context) ([]*domain.Job, error) {
+// GetActiveJobs retrieves all jobs that are available for polling
+func (s *JobService) GetActiveJobs(ctx context.Context) ([]*domain.Job, error) {
 	s.logger(ctx).Debug().Msg("retrieving all active jobs")
 
-	jobs, err := s.jobRepo.GetAllJobs()
+	jobs, err := s.jobRepo.FindActiveJobs()
 	if err != nil {
 		s.logger(ctx).Error().Err(err).Msg("failed to retrieve jobs from repository")
 		return nil, err
@@ -72,7 +71,7 @@ func (s *JobService) GetJobByID(ctx context.Context, id string) (*domain.Job, er
 		Str("job_id", id).
 		Msg("retrieving job by ID")
 
-	job, err := s.jobRepo.GetJobByID(id)
+	job, err := s.jobRepo.FindJobById(id)
 	if err != nil {
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", id).
