@@ -111,7 +111,8 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 		log.Fatalf("failed to create execution service: %v", err)
 	}
 
-	scheduler := service.NewJobScheduler(ctx, rdb, "job_queue", *config.PollingInterval, jobService, executionService, blockchainService)
+	jobCache := repository.NewJobCacheRepository(rdb, "job_queue")
+	scheduler := service.NewJobScheduler(ctx, jobCache, *config.PollingInterval, jobService, executionService, blockchainService)
 
 	return &Application{
 		config:         config,

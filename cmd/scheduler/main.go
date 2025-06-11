@@ -29,8 +29,8 @@ const (
 	StatusFailed  JobStatus = "failed"
 )
 
-// JobResult contains the execution result
-type JobResult struct {
+// JobCache contains the execution result
+type JobCache struct {
 	JobID     string    `json:"job_id"`
 	Status    JobStatus `json:"status"`
 	Message   string    `json:"message"`
@@ -138,7 +138,7 @@ func (js *JobScheduler) shouldSkipJob(jobID string) bool {
 		return false
 	}
 
-	var result JobResult
+	var result JobCache
 	if err := json.Unmarshal([]byte(statusData), &result); err != nil {
 		log.Printf("Error unmarshaling job status for %s: %v", jobID, err)
 		return false
@@ -236,7 +236,7 @@ func (js *JobScheduler) executeJobLogic(job Job) (bool, string) {
 // setJobStatus updates the job status in Redis cache
 func (js *JobScheduler) setJobStatus(jobID string, status JobStatus, message string) {
 	statusKey := fmt.Sprintf("%s:%s", js.statusCache, jobID)
-	result := JobResult{
+	result := JobCache{
 		JobID:     jobID,
 		Status:    status,
 		Message:   message,
@@ -282,7 +282,7 @@ func (js *JobScheduler) checkJobStatusUpdate(statusKey string) {
 		return
 	}
 
-	var result JobResult
+	var result JobCache
 	if err := json.Unmarshal([]byte(statusData), &result); err != nil {
 		log.Printf("Error unmarshaling job status from %s: %v", statusKey, err)
 		return
@@ -327,7 +327,7 @@ func (js *JobScheduler) getJobsToCheck() []Job {
 }
 
 // GetJobStatus retrieves the current status of a job
-func (js *JobScheduler) GetJobStatus(jobID string) (*JobResult, error) {
+func (js *JobScheduler) GetJobStatus(jobID string) (*JobCache, error) {
 	statusKey := fmt.Sprintf("%s:%s", js.statusCache, jobID)
 	statusData, err := js.redis.Get(js.ctx, statusKey).Result()
 	if err != nil {
@@ -337,7 +337,7 @@ func (js *JobScheduler) GetJobStatus(jobID string) (*JobResult, error) {
 		return nil, err
 	}
 
-	var result JobResult
+	var result JobCache
 	err = json.Unmarshal([]byte(statusData), &result)
 	return &result, err
 }
