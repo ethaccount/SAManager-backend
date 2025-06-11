@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"reflect"
 	"sync"
@@ -80,7 +81,6 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 
 	MigrationUp(*config.DSN, migrationPath)
 
-	// Passkey Service
 	passkeyRepo := repository.NewPasskeyRepository(database)
 
 	webAuthnConfig := &webauthn.Config{
@@ -95,34 +95,23 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 		return nil
 	}
 
-	// Job Service
 	jobRepo := repository.NewJobRepository(database)
 	jobService := service.NewJobService(jobRepo)
 
-	// Scheduler
-	scheduler := service.NewJobScheduler(ctx, rdb, "job_queue", *config.PollingInterval, jobService)
+	blockchainService := service.NewBlockchainService(service.BlockchainConfig{
+		SepoliaRPCURL:         *config.SepoliaRPCURL,
+		ArbitrumSepoliaRPCURL: *config.ArbitrumSepoliaRPCURL,
+		BaseSepoliaRPCURL:     *config.BaseSepoliaRPCURL,
+		OptimismSepoliaRPCURL: *config.OptimismSepoliaRPCURL,
+		PolygonAmoyRPCURL:     *config.PolygonAmoyRPCURL,
+	})
 
-	// Blockchain Service
-	// blockchainService := service.NewBlockchainService(service.BlockchainConfig{
-	// 	SepoliaRPCURL:         *config.SepoliaRPCURL,
-	// 	ArbitrumSepoliaRPCURL: *config.ArbitrumSepoliaRPCURL,
-	// 	BaseSepoliaRPCURL:     *config.BaseSepoliaRPCURL,
-	// 	OptimismSepoliaRPCURL: *config.OptimismSepoliaRPCURL,
-	// 	PolygonAmoyRPCURL:     *config.PolygonAmoyRPCURL,
-	// })
+	executionService, err := service.NewExecutionService(blockchainService, *config.PrivateKey)
+	if err != nil {
+		log.Fatalf("failed to create execution service: %v", err)
+	}
 
-	// // Polling Service
-	// pollingService := service.NewPollingService(jobService, blockchainService, service.PollingConfig{
-	// 	PollingInterval: 10 * time.Second,
-	// })
-
-	// go pollingService.Start(ctx)
-
-	// // Execution Service
-	// executionService, err := service.NewExecutionService(blockchainService, *config.PrivateKey)
-	// if err != nil {
-	// 	log.Fatalf("failed to create execution service: %v", err)
-	// }
+	scheduler := service.NewJobScheduler(ctx, rdb, "job_queue", *config.PollingInterval, jobService, executionService, blockchainService)
 
 	return &Application{
 		config:         config,
@@ -213,9 +202,12 @@ func (app *Application) RunPollingWorker(ctx context.Context, wg *sync.WaitGroup
 	logger.Info().Msg("Starting polling worker")
 
 	app.Scheduler.Start()
+
 	<-ctx.Done()
 	logger.Info().Msg("Stopping polling worker...")
+
 	app.Scheduler.Stop()
+
 	logger.Info().Msg("Polling worker stopped")
 }
 
@@ -250,6 +242,7 @@ func (app *Application) registerRoutes(ctx context.Context, router *gin.Engine) 
 	v1 := router.Group("/api/v1")
 	{
 		v1.GET("/health", handler.HandleHealthCheck)
+
 		v1.POST("/register/begin", passkeyHandler.RegisterBegin())
 		// v1.POST("/register/verify", passkeyHandler.RegisterVerify)
 		// v1.POST("/login/options", passkeyHandler.LoginOptions)
