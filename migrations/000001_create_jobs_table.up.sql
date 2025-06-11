@@ -9,5 +9,5 @@ CREATE TABLE IF NOT EXISTS jobs (
     err_msg TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(account_address, on_chain_job_id)
+    UNIQUE(account_address, chain_id, on_chain_job_id)
 );
