@@ -106,24 +106,30 @@ func (js *JobScheduler) processJobs() {
 				continue
 			}
 
-			// Process the job
-			js.processJobLogic(*job)
+			// execute the job
+			js.executeJobLogic(*job)
 		}
 	}
 }
 
 // pollJobsLogic checks for jobs to execute and enqueues them
 func (js *JobScheduler) pollJobLogic() {
-	logger := js.logger(js.ctx).With().Str("function", "checkAndEnqueueJobs").Logger()
+	logger := js.logger(js.ctx).With().Str("function", "pollJobLogic").Logger()
 
-	// Get failed jobs from cache and update to DB
+	// Step 1: Process Pending Jobs
 
-	// Get all active jobs
+	// Step 2: Sync Cache to Database
+
+	// Step 3: Load Active Jobs
 	jobs, err := js.jobService.GetActiveJobs(js.ctx)
 	if err != nil {
-		js.logger(js.ctx).Error().Err(err).Str("function", "checkAndEnqueueJobs").Msg("Failed to get jobs from job service")
+		logger.Error().Err(err).Msg("Failed to get active jobs from job service")
 		return
 	}
+
+	// Step 4: Validate Job Readiness
+
+	// Step 5: Enqueue Overdue Jobs
 
 	for _, job := range jobs {
 		// Check if job should be skipped based on status in cache
@@ -163,13 +169,16 @@ func (js *JobScheduler) shouldSkipJob(jobID uuid.UUID) bool {
 	return result.Status == repository.StatusPending
 }
 
-// processJobLogic executes a single job and updates its status
-func (js *JobScheduler) processJobLogic(job domain.JobModel) {
-	logger := js.logger(js.ctx).With().Str("function", "processJob").Logger()
-	logger.Info().Msgf("Processing job: %s", job.ID)
+// executeJobLogic executes a single job and updates its status
+func (js *JobScheduler) executeJobLogic(job domain.JobModel) {
+	logger := js.logger(js.ctx).With().Str("function", "executeJobLogic").Logger()
+	logger.Info().Str("jobID", job.ID.String()).Msg("Executing job")
 
-	// Simulate job execution
-	success, message := js.executeJobLogic(job)
+	// Step 1: Execute Job
+
+	success, message := js.testExecuteJobLogic(job)
+
+	// Step 2: Update Job Status
 
 	if success {
 		// Remove the job status from cache since execution was successful
@@ -188,7 +197,7 @@ func (js *JobScheduler) processJobLogic(job domain.JobModel) {
 }
 
 // executeJobLogic simulates the actual job execution logic
-func (js *JobScheduler) executeJobLogic(job domain.JobModel) (bool, string) {
+func (js *JobScheduler) testExecuteJobLogic(job domain.JobModel) (bool, string) {
 	// Simulate processing time
 	time.Sleep(time.Duration(100+job.ID[0]%5) * time.Millisecond)
 	js.logger(js.ctx).Info().Msgf("Job %s executed successfully", job.ID)
