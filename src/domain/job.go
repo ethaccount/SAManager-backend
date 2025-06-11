@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Job represents a job mapping in the scheduling system
-type Job struct {
+// JobModel represents a job in the database
+type JobModel struct {
 	ID                uuid.UUID       `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	AccountAddress    common.Address  `gorm:"type:varchar(42);not null" json:"accountAddress"`
 	ChainID           int64           `gorm:"not null" json:"chainId"`
@@ -26,7 +26,7 @@ type Job struct {
 }
 
 // GetUserOperation returns the user operation as a typed struct
-func (j *Job) GetUserOperation() (*erc4337.UserOperation, error) {
+func (j *JobModel) GetUserOperation() (*erc4337.UserOperation, error) {
 	var userOp erc4337.UserOperation
 	if err := json.Unmarshal(j.UserOperation, &userOp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal user operation: %w", err)
@@ -34,6 +34,7 @@ func (j *Job) GetUserOperation() (*erc4337.UserOperation, error) {
 	return &userOp, nil
 }
 
+// ExecutionConfig represents the job configuration from the blockchain
 type ExecutionConfig struct {
 	ExecuteInterval             *big.Int
 	NumberOfExecutions          uint16
@@ -65,4 +66,10 @@ func (ec *ExecutionConfig) IsTimeToExecute() bool {
 
 	// Check if current time is >= next execution time
 	return now.Cmp(nextExecutionTime) >= 0
+}
+
+// Job represents a job for use in the scheduler
+type Job struct {
+	JobModel
+	ExecutionConfig
 }

@@ -66,7 +66,7 @@ type JobResponse struct {
 }
 
 // toJobResponse converts a domain Job to a JobResponse with formatted time fields
-func toJobResponse(job *domain.Job) JobResponse {
+func toJobResponse(job *domain.JobModel) JobResponse {
 	return JobResponse{
 		ID:                job.ID.String(),
 		AccountAddress:    job.AccountAddress.Hex(),

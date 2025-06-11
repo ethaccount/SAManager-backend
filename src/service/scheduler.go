@@ -164,7 +164,7 @@ func (js *JobScheduler) shouldSkipJob(jobID uuid.UUID) bool {
 }
 
 // processJobLogic executes a single job and updates its status
-func (js *JobScheduler) processJobLogic(job domain.Job) {
+func (js *JobScheduler) processJobLogic(job domain.JobModel) {
 	logger := js.logger(js.ctx).With().Str("function", "processJob").Logger()
 	logger.Info().Msgf("Processing job: %s", job.ID)
 
@@ -188,7 +188,7 @@ func (js *JobScheduler) processJobLogic(job domain.Job) {
 }
 
 // executeJobLogic simulates the actual job execution logic
-func (js *JobScheduler) executeJobLogic(job domain.Job) (bool, string) {
+func (js *JobScheduler) executeJobLogic(job domain.JobModel) (bool, string) {
 	// Simulate processing time
 	time.Sleep(time.Duration(100+job.ID[0]%5) * time.Millisecond)
 	js.logger(js.ctx).Info().Msgf("Job %s executed successfully", job.ID)

@@ -17,13 +17,13 @@ func NewJobRepository(db *gorm.DB) *JobRepository {
 	return &JobRepository{db: db}
 }
 
-func (r *JobRepository) CreateJob(accountAddress common.Address, chainId int64, jobID int64, userOperation *erc4337.UserOperation, entryPoint common.Address) (*domain.Job, error) {
+func (r *JobRepository) CreateJob(accountAddress common.Address, chainId int64, jobID int64, userOperation *erc4337.UserOperation, entryPoint common.Address) (*domain.JobModel, error) {
 	userOpJSON, err := json.Marshal(userOperation)
 	if err != nil {
 		return nil, err
 	}
 
-	job := &domain.Job{
+	job := &domain.JobModel{
 		AccountAddress:    accountAddress,
 		ChainID:           chainId,
 		OnChainJobID:      jobID,
@@ -39,8 +39,8 @@ func (r *JobRepository) CreateJob(accountAddress common.Address, chainId int64, 
 }
 
 // FindJobs retrieves all registered jobs from the database
-func (r *JobRepository) FindJobs() ([]*domain.Job, error) {
-	var jobs []*domain.Job
+func (r *JobRepository) FindJobs() ([]*domain.JobModel, error) {
+	var jobs []*domain.JobModel
 	if err := r.db.Find(&jobs).Error; err != nil {
 		return nil, err
 	}
@@ -48,8 +48,8 @@ func (r *JobRepository) FindJobs() ([]*domain.Job, error) {
 }
 
 // FindJobById retrieves a specific job by its ID
-func (r *JobRepository) FindJobById(id string) (*domain.Job, error) {
-	var job domain.Job
+func (r *JobRepository) FindJobById(id string) (*domain.JobModel, error) {
+	var job domain.JobModel
 	if err := r.db.Where("id = ?", id).First(&job).Error; err != nil {
 		return nil, err
 	}
@@ -57,8 +57,8 @@ func (r *JobRepository) FindJobById(id string) (*domain.Job, error) {
 }
 
 // FindActiveJobs retrieves all jobs with "queuing" status from the database
-func (r *JobRepository) FindActiveJobs() ([]*domain.Job, error) {
-	var jobs []*domain.Job
+func (r *JobRepository) FindActiveJobs() ([]*domain.JobModel, error) {
+	var jobs []*domain.JobModel
 	if err := r.db.Where("status = ?", "queuing").Find(&jobs).Error; err != nil {
 		return nil, err
 	}

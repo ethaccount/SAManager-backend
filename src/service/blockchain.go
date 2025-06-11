@@ -77,7 +77,7 @@ func (b *BlockchainService) GetClient(chainId int64) (*ethclient.Client, error) 
 	return client, nil
 }
 
-func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.Job) (*domain.ExecutionConfig, error) {
+func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.JobModel) (*domain.ExecutionConfig, error) {
 	b.logger(ctx).Debug().
 		Str("account_address", job.AccountAddress.Hex()).
 		Int64("chain_id", job.ChainID).
@@ -155,7 +155,7 @@ func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.
 
 // GetExecutionConfigsBatch retrieves execution configs for multiple jobs in batch
 // Groups jobs by chain ID and makes batch calls for efficiency
-func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs []*domain.Job) (map[string]*domain.ExecutionConfig, error) {
+func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs []*domain.JobModel) (map[string]*domain.ExecutionConfig, error) {
 	b.logger(ctx).Debug().
 		Int("job_count", len(jobs)).
 		Msg("getting execution configs in batch")
@@ -165,7 +165,7 @@ func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs [
 	}
 
 	// Group jobs by chain ID for batch processing
-	jobsByChain := make(map[int64][]*domain.Job)
+	jobsByChain := make(map[int64][]*domain.JobModel)
 	for _, job := range jobs {
 		jobsByChain[job.ChainID] = append(jobsByChain[job.ChainID], job)
 	}
