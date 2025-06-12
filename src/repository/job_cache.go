@@ -231,3 +231,50 @@ func (r *JobCacheRepository) UpdateJobCacheUserOpHash(ctx context.Context, jobID
 	// Set with 24-hour expiration
 	return r.redis.Set(ctx, statusKey, jobData, 24*time.Hour).Err()
 }
+
+// CacheStatistics represents the current state of the job cache
+type CacheStatistics struct {
+	PendingCount   int `json:"pending_count"`
+	FailedCount    int `json:"failed_count"`
+	CompletedCount int `json:"completed_count"`
+	TotalCount     int `json:"total_count"`
+}
+
+// GetCacheStatistics retrieves statistics about the current cache state
+func (r *JobCacheRepository) GetCacheStatistics(ctx context.Context) (*CacheStatistics, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	keys, err := r.getAllStatusKeysInternal(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status keys: %w", err)
+	}
+
+	stats := &CacheStatistics{}
+	statusCounts := make(map[CacheJobStatus]int)
+
+	for _, key := range keys {
+		statusData, err := r.redis.Get(ctx, key).Result()
+		if err != nil {
+			// Skip keys that no longer exist (expired or deleted)
+			if err == redis.Nil {
+				continue
+			}
+			return nil, fmt.Errorf("failed to get job cache for key %s: %w", key, err)
+		}
+
+		var jobCache JobCache
+		if err := json.Unmarshal([]byte(statusData), &jobCache); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal job cache for key %s: %w", key, err)
+		}
+
+		statusCounts[jobCache.Status]++
+	}
+
+	stats.PendingCount = statusCounts[CacheStatusPending]
+	stats.FailedCount = statusCounts[CacheStatusFailed]
+	stats.CompletedCount = statusCounts[CacheStatusCompleted]
+	stats.TotalCount = stats.PendingCount + stats.FailedCount + stats.CompletedCount
+
+	return stats, nil
+}

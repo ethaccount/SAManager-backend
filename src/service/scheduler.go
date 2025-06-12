@@ -133,6 +133,18 @@ func (js *JobScheduler) pollJobLogic() {
 	// Step 2: Sync Cache to Database
 	js.syncCacheToDatabase()
 
+	// Log current cache state after sync
+	if cacheStats, err := js.jobCache.GetCacheStatistics(js.ctx); err != nil {
+		logger.Error().Err(err).Msg("Failed to get cache statistics")
+	} else {
+		logger.Info().
+			Int("pending", cacheStats.PendingCount).
+			Int("failed", cacheStats.FailedCount).
+			Int("completed", cacheStats.CompletedCount).
+			Int("total", cacheStats.TotalCount).
+			Msg("Current cache state after sync")
+	}
+
 	// Step 3: Load Active Jobs
 	jobs, err := js.jobService.GetActiveJobs(js.ctx)
 	if err != nil {
@@ -149,6 +161,11 @@ func (js *JobScheduler) pollJobLogic() {
 	jobsToExecute, err := js.fetchExecutionConfigsAndFilterJobs(jobs)
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to fetch execution configs and filter jobs")
+		return
+	}
+
+	if len(jobsToExecute) == 0 {
+		logger.Info().Msg("No jobs to execute")
 		return
 	}
 
