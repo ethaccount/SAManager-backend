@@ -242,15 +242,21 @@ func (app *Application) registerRoutes(ctx context.Context, router *gin.Engine) 
 
 	v1 := router.Group("/api/v1")
 	{
+		// Public endpoints (no authentication required)
 		v1.GET("/health", handler.HandleHealthCheck)
 
-		// v1.POST("/register/begin", passkeyHandler.RegisterBegin())
-		// v1.POST("/register/verify", passkeyHandler.RegisterVerify)
-		// v1.POST("/login/options", passkeyHandler.LoginOptions)
-		// v1.POST("/login/verify", passkeyHandler.LoginVerify)
+		// Protected endpoints (require shared secret)
+		protected := v1.Group("/")
+		protected.Use(handler.SharedSecretMiddleware(*app.config.APISecret))
+		{
+			// protected.POST("/register/begin", passkeyHandler.RegisterBegin())
+			// protected.POST("/register/verify", passkeyHandler.RegisterVerify)
+			// protected.POST("/login/options", passkeyHandler.LoginOptions)
+			// protected.POST("/login/verify", passkeyHandler.LoginVerify)
 
-		// Job management endpoints
-		v1.GET("/jobs", jobHandler.GetJobList)
-		v1.POST("/jobs", jobHandler.RegisterJob)
+			// Job management endpoints
+			protected.GET("/jobs", jobHandler.GetJobList)
+			protected.POST("/jobs", jobHandler.RegisterJob)
+		}
 	}
 }

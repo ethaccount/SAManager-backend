@@ -16,6 +16,8 @@ type AppConfig struct {
 	RedisAddr *string
 	// Private key for signing user operations (required)
 	PrivateKey *string
+	// API secret for validating requests from frontend (required)
+	APISecret *string
 
 	// =========================== OPTIONAL ===========================
 
@@ -83,6 +85,13 @@ func loadRequiredConfig(config *AppConfig) {
 	// Remove 0x prefix if it exists
 	privateKey = strings.TrimPrefix(privateKey, "0x")
 	config.PrivateKey = &privateKey
+
+	// API secret for validating requests from frontend (required)
+	apiSecret := os.Getenv("API_SECRET")
+	if apiSecret == "" {
+		log.Fatalf("REQUIRED: API_SECRET not set in environment")
+	}
+	config.APISecret = &apiSecret
 
 	// CORS origins (required in production, optional in development)
 	loadCORSConfig(config)
