@@ -36,11 +36,10 @@ import (
 const (
 	AppName    = "SAManager Backend"
 	AppVersion = "0.0.1"
-	AppBuild   = "dev"
 )
 
 func main() {
-	err := godotenv.Overload()
+	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file")
 	}
@@ -64,7 +63,7 @@ func main() {
 
 	logger.Info().
 		Str("version", AppVersion).
-		Str("build", AppBuild).
+		Str("environment", *config.Environment).
 		Msgf("Launching %s", AppName)
 
 	logger.Info().
