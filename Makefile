@@ -1,4 +1,4 @@
-include .env
+-include .env
 export
 
 .PHONY: run # .PHONY is to make always executes the commands regardless of whether a file named "run" exists.
