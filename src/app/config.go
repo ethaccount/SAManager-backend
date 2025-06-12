@@ -10,14 +10,18 @@ import (
 type AppConfig struct {
 	// =========================== REQUIRED ===========================
 
+	// Environment configuration (required)
+	Environment *string
 	// Database configuration (required)
 	DSN *string
 	// Redis configuration (required)
-	RedisAddr *string
+	RedisURL *string
 	// Private key for signing user operations (required)
 	PrivateKey *string
 	// API secret for validating requests from frontend (required)
 	APISecret *string
+	// CORS configuration (required)
+	AllowOrigins *[]string
 
 	// =========================== OPTIONAL ===========================
 
@@ -26,9 +30,6 @@ type AppConfig struct {
 
 	// HTTP server configuration
 	Port *string
-
-	// CORS configuration
-	AllowOrigins *[]string
 
 	// Polling configuration
 	PollingInterval *int
@@ -71,11 +72,11 @@ func loadRequiredConfig(config *AppConfig) {
 	config.DSN = &dsn
 
 	// Redis URL (required)
-	redisAddr := os.Getenv("REDIS_URL")
-	if redisAddr == "" {
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
 		log.Fatalf("REQUIRED: REDIS_URL not set in environment")
 	}
-	config.RedisAddr = &redisAddr
+	config.RedisURL = &redisURL
 
 	// Private key for signing operations (required)
 	privateKey := os.Getenv("PRIVATE_KEY")
@@ -95,6 +96,17 @@ func loadRequiredConfig(config *AppConfig) {
 
 	// CORS origins (required in production, optional in development)
 	loadCORSConfig(config)
+
+	// Environment (required)
+	environment := os.Getenv("ENVIRONMENT")
+	if environment == "" {
+		log.Fatalf("REQUIRED: ENVIRONMENT not set in environment")
+	}
+	// Validate environment value
+	if environment != "dev" && environment != "staging" && environment != "prod" {
+		log.Fatalf("REQUIRED: ENVIRONMENT must be one of: dev, staging, prod (got: %s)", environment)
+	}
+	config.Environment = &environment
 }
 
 // loadOptionalConfig loads all optional configuration values with sensible defaults
@@ -123,28 +135,20 @@ func loadOptionalConfig(config *AppConfig) {
 	loadRPCConfig(config)
 }
 
-// loadCORSConfig handles CORS origins configuration with environment-specific behavior
+// loadCORSConfig handles CORS origins configuration
 func loadCORSConfig(config *AppConfig) {
 	allowOriginsStr := os.Getenv("ALLOW_ORIGINS")
-	var allowOrigins []string
+	if allowOriginsStr == "" {
+		log.Fatalf("REQUIRED: ALLOW_ORIGINS not set in environment")
+	}
 
-	if allowOriginsStr != "" {
-		// Parse comma-separated origins
-		origins := strings.Split(allowOriginsStr, ",")
-		for _, origin := range origins {
-			origin = strings.TrimSpace(origin)
-			if origin != "" {
-				allowOrigins = append(allowOrigins, origin)
-			}
-		}
-	} else {
-		// Handle missing ALLOW_ORIGINS based on environment
-		environment := os.Getenv("ENVIRONMENT")
-		if environment == "development" || environment == "dev" {
-			// Default to localhost in development
-			allowOrigins = []string{"http://localhost:5173"}
-		} else {
-			log.Fatalf("REQUIRED: ALLOW_ORIGINS not set in environment (required in production)")
+	var allowOrigins []string
+	// Parse comma-separated origins
+	origins := strings.Split(allowOriginsStr, ",")
+	for _, origin := range origins {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			allowOrigins = append(allowOrigins, origin)
 		}
 	}
 

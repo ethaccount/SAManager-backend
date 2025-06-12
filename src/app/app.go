@@ -40,7 +40,7 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 	logger := zerolog.Ctx(ctx).With().Str("function", "NewApplication").Logger()
 
 	// Connect to Redis
-	redisOpts, err := redis.ParseURL(*config.RedisAddr)
+	redisOpts, err := redis.ParseURL(*config.RedisURL)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to parse redis URL")
 		return nil
