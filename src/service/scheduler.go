@@ -16,7 +16,7 @@ import (
 )
 
 type CombinedJob struct {
-	JobModel        domain.JobModel
+	EntityJob       domain.EntityJob
 	ExecutionConfig domain.ExecutionConfig
 }
 
@@ -156,50 +156,50 @@ func (js *JobScheduler) pollJobLogic() {
 	// Step 5: Enqueue jobs and add to cache
 	for _, job := range jobsToExecute {
 		// Compute userOpHash before enqueuing
-		userOp, err := job.JobModel.GetUserOperation()
+		userOp, err := job.EntityJob.GetUserOperation()
 		if err != nil {
-			logger.Error().Err(err).Str("jobID", job.JobModel.ID.String()).Msg("Failed to get user operation from job during enqueue")
+			logger.Error().Err(err).Str("jobID", job.EntityJob.ID.String()).Msg("Failed to get user operation from job during enqueue")
 			continue
 		}
 
-		userOpHash, err := userOp.GetUserOpHashV07(big.NewInt(job.JobModel.ChainID))
+		userOpHash, err := userOp.GetUserOpHashV07(big.NewInt(job.EntityJob.ChainID))
 		if err != nil {
-			logger.Error().Err(err).Str("jobID", job.JobModel.ID.String()).Msg("Failed to compute user operation hash during enqueue")
+			logger.Error().Err(err).Str("jobID", job.EntityJob.ID.String()).Msg("Failed to compute user operation hash during enqueue")
 			continue
 		}
 
 		// Add job to cache with pending status
 		jobCache := &repository.JobCache{
-			JobID:      job.JobModel.ID,
-			ChainID:    job.JobModel.ChainID,
+			JobID:      job.EntityJob.ID,
+			ChainID:    job.EntityJob.ChainID,
 			UserOpHash: userOpHash,
 			Status:     repository.CacheStatusPending,
 		}
 
 		if err := js.jobCache.AddJobCache(js.ctx, jobCache); err != nil {
-			logger.Error().Err(err).Str("jobID", job.JobModel.ID.String()).Msg("Failed to add job to cache during enqueue")
+			logger.Error().Err(err).Str("jobID", job.EntityJob.ID.String()).Msg("Failed to add job to cache during enqueue")
 			continue
 		}
 
 		// Enqueue the job
-		if err := js.jobCache.EnqueueJob(js.ctx, job.JobModel); err != nil {
-			logger.Error().Err(err).Msgf("Failed to enqueue job %s", job.JobModel.ID)
+		if err := js.jobCache.EnqueueJob(js.ctx, job.EntityJob); err != nil {
+			logger.Error().Err(err).Msgf("Failed to enqueue job %s", job.EntityJob.ID)
 			// If enqueue fails, remove from cache to maintain consistency
-			if delErr := js.jobCache.DeleteJobCache(js.ctx, job.JobModel.ID); delErr != nil {
-				logger.Error().Err(delErr).Msgf("Failed to cleanup cache after enqueue failure for %s", job.JobModel.ID)
+			if delErr := js.jobCache.DeleteJobCache(js.ctx, job.EntityJob.ID); delErr != nil {
+				logger.Error().Err(delErr).Msgf("Failed to cleanup cache after enqueue failure for %s", job.EntityJob.ID)
 			}
 			continue
 		}
 
 		logger.Info().
-			Str("jobID", job.JobModel.ID.String()).
+			Str("jobID", job.EntityJob.ID.String()).
 			Str("userOpHash", userOpHash.Hex()).
 			Msg("Job added to cache and enqueued successfully")
 	}
 }
 
 // executeJobLogic executes a single job and updates its status
-func (js *JobScheduler) executeJobLogic(job domain.JobModel) {
+func (js *JobScheduler) executeJobLogic(job domain.EntityJob) {
 	logger := js.logger(js.ctx).With().Str("function", "executeJobLogic").Logger()
 	logger.Info().Str("jobID", job.ID.String()).Msg("Executing job...")
 
@@ -261,7 +261,7 @@ func (js *JobScheduler) executeJobLogic(job domain.JobModel) {
 }
 
 // fetchExecutionConfigsAndFilterJobs fetches execution configs in batch and filters jobs
-func (js *JobScheduler) fetchExecutionConfigsAndFilterJobs(jobs []*domain.JobModel) ([]CombinedJob, error) {
+func (js *JobScheduler) fetchExecutionConfigsAndFilterJobs(jobs []*domain.EntityJob) ([]CombinedJob, error) {
 	logger := js.logger(js.ctx).With().Str("function", "fetchExecutionConfigsAndFilterJobs").Logger()
 
 	// Fetch execution configs in batch
@@ -288,7 +288,7 @@ func (js *JobScheduler) fetchExecutionConfigsAndFilterJobs(jobs []*domain.JobMod
 
 		// Create CombinedJob struct
 		job := CombinedJob{
-			JobModel:        *jobModel,
+			EntityJob:       *jobModel,
 			ExecutionConfig: *config,
 		}
 

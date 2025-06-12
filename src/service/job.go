@@ -27,7 +27,7 @@ func (s *JobService) logger(ctx context.Context) *zerolog.Logger {
 }
 
 // RegisterJob creates a new job registration
-func (s *JobService) RegisterJob(ctx context.Context, accountAddress common.Address, chainId int64, jobID int64, userOperation *erc4337.UserOperation, entryPoint common.Address) (*domain.JobModel, error) {
+func (s *JobService) RegisterJob(ctx context.Context, accountAddress common.Address, chainId int64, jobID int64, userOperation *erc4337.UserOperation, entryPoint common.Address) (*domain.EntityJob, error) {
 	s.logger(ctx).Info().
 		Str("function", "RegisterJob").
 		Str("accountAddress", accountAddress.Hex()).
@@ -51,7 +51,7 @@ func (s *JobService) RegisterJob(ctx context.Context, accountAddress common.Addr
 }
 
 // GetActiveJobs retrieves all jobs that are available for polling
-func (s *JobService) GetActiveJobs(ctx context.Context) ([]*domain.JobModel, error) {
+func (s *JobService) GetActiveJobs(ctx context.Context) ([]*domain.EntityJob, error) {
 	s.logger(ctx).Debug().Msg("retrieving all active jobs")
 
 	jobs, err := s.jobRepo.FindActiveJobs()
@@ -65,7 +65,7 @@ func (s *JobService) GetActiveJobs(ctx context.Context) ([]*domain.JobModel, err
 }
 
 // GetJobByID retrieves a specific job by its ID
-func (s *JobService) GetJobByID(ctx context.Context, id string) (*domain.JobModel, error) {
+func (s *JobService) GetJobByID(ctx context.Context, id string) (*domain.EntityJob, error) {
 	s.logger(ctx).Debug().
 		Str("function", "GetJobByID").
 		Str("job_id", id).

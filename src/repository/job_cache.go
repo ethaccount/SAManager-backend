@@ -50,7 +50,7 @@ func NewJobCacheRepository(redis *redis.Client, queueName string) *JobCacheRepos
 }
 
 // EnqueueJob adds a job to the Redis queue
-func (r *JobCacheRepository) EnqueueJob(ctx context.Context, job domain.JobModel) error {
+func (r *JobCacheRepository) EnqueueJob(ctx context.Context, job domain.EntityJob) error {
 	jobData, err := json.Marshal(job)
 	if err != nil {
 		return fmt.Errorf("failed to marshal job: %w", err)
@@ -60,13 +60,13 @@ func (r *JobCacheRepository) EnqueueJob(ctx context.Context, job domain.JobModel
 }
 
 // DequeueJob pops a job from the Redis queue
-func (r *JobCacheRepository) DequeueJob(ctx context.Context, timeout time.Duration) (*domain.JobModel, error) {
+func (r *JobCacheRepository) DequeueJob(ctx context.Context, timeout time.Duration) (*domain.EntityJob, error) {
 	result, err := r.redis.BRPop(ctx, timeout, r.queueName).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	var job domain.JobModel
+	var job domain.EntityJob
 	if err := json.Unmarshal([]byte(result[1]), &job); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal job: %w", err)
 	}

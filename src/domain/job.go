@@ -20,28 +20,73 @@ const (
 	DBJobStatusFailed    DBJobStatus = "failed"
 )
 
-// JobModel represents a job in the database
-type JobModel struct {
+// DBJob represents a job in the database (persistence layer)
+type DBJob struct {
 	ID                uuid.UUID       `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	AccountAddress    common.Address  `gorm:"type:varchar(42);not null" json:"accountAddress"`
+	AccountAddress    string          `gorm:"type:varchar(42);not null" json:"accountAddress"`
 	ChainID           int64           `gorm:"not null" json:"chainId"`
 	OnChainJobID      int64           `gorm:"not null" json:"onChainJobId"`
 	UserOperation     json.RawMessage `gorm:"type:jsonb;not null" json:"userOperation"`
-	EntryPointAddress common.Address  `gorm:"type:varchar(42);not null" json:"entryPointAddress"`
+	EntryPointAddress string          `gorm:"type:varchar(42);not null" json:"entryPointAddress"`
 	Status            DBJobStatus     `gorm:"type:varchar(20);not null;default:queuing;check:status IN ('queuing', 'completed', 'failed')" json:"status"`
 	ErrMsg            *string         `gorm:"type:text" json:"errMsg,omitempty"`
 	CreatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP" json:"createdAt"`
 	UpdatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP" json:"updatedAt"`
 }
 
-func (JobModel) TableName() string {
+func (DBJob) TableName() string {
 	return "jobs"
 }
 
+// ToEntityJob converts DBJob to EntityJob
+func (j *DBJob) ToEntityJob() (*EntityJob, error) {
+	return &EntityJob{
+		ID:                j.ID,
+		AccountAddress:    common.HexToAddress(j.AccountAddress),
+		ChainID:           j.ChainID,
+		OnChainJobID:      j.OnChainJobID,
+		UserOperation:     j.UserOperation,
+		EntryPointAddress: common.HexToAddress(j.EntryPointAddress),
+		Status:            j.Status,
+		ErrMsg:            j.ErrMsg,
+		CreatedAt:         j.CreatedAt,
+		UpdatedAt:         j.UpdatedAt,
+	}, nil
+}
+
+// EntityJob represents a job in the database
+type EntityJob struct {
+	ID                uuid.UUID
+	AccountAddress    common.Address
+	ChainID           int64
+	OnChainJobID      int64
+	UserOperation     json.RawMessage
+	EntryPointAddress common.Address
+	Status            DBJobStatus
+	ErrMsg            *string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+func (rj *EntityJob) ToDBJob() *DBJob {
+	return &DBJob{
+		ID:                rj.ID,
+		AccountAddress:    rj.AccountAddress.Hex(),
+		ChainID:           rj.ChainID,
+		OnChainJobID:      rj.OnChainJobID,
+		UserOperation:     rj.UserOperation,
+		EntryPointAddress: rj.EntryPointAddress.Hex(),
+		Status:            rj.Status,
+		ErrMsg:            rj.ErrMsg,
+		CreatedAt:         rj.CreatedAt,
+		UpdatedAt:         rj.UpdatedAt,
+	}
+}
+
 // GetUserOperation returns the user operation as a typed struct
-func (j *JobModel) GetUserOperation() (*erc4337.UserOperation, error) {
+func (rj *EntityJob) GetUserOperation() (*erc4337.UserOperation, error) {
 	var userOp erc4337.UserOperation
-	if err := json.Unmarshal(j.UserOperation, &userOp); err != nil {
+	if err := json.Unmarshal(rj.UserOperation, &userOp); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal user operation: %w", err)
 	}
 	return &userOp, nil

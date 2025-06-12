@@ -161,7 +161,7 @@ func getMaxFeePerGas(ctx context.Context, rpcClient *rpc.Client) (*big.Int, *big
 }
 
 // ExecuteJob signs the user operation and sends it to the bundler
-func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.JobModel) (*common.Hash, error) {
+func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.EntityJob) (*common.Hash, error) {
 	s.logger(ctx).Info().
 		Str("job_id", job.ID.String()).
 		Str("account_address", job.AccountAddress.Hex()).

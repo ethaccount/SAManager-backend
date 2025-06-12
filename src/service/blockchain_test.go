@@ -35,7 +35,7 @@ func TestGetExecutionConfig(t *testing.T) {
 	blockchainService := getBlockchainService()
 
 	// Create test job with the provided data
-	job := &domain.JobModel{
+	job := &domain.EntityJob{
 		ID:                uuid.New(),
 		AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 		ChainID:           11155111, // Sepolia testnet
@@ -102,7 +102,7 @@ func TestGetExecutionConfig_UnsupportedChain(t *testing.T) {
 	ctx := context.Background()
 	blockchainService := getBlockchainService()
 
-	job := &domain.JobModel{
+	job := &domain.EntityJob{
 		ID:                uuid.New(),
 		AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 		ChainID:           1, // Unsupported mainnet
@@ -135,7 +135,7 @@ func TestGetExecutionConfigsBatch_EmptyInput(t *testing.T) {
 	blockchainService := getBlockchainService()
 
 	// Test with empty job slice
-	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, []*domain.JobModel{})
+	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, []*domain.EntityJob{})
 
 	// Should succeed with empty result
 	if err != nil {
@@ -156,7 +156,7 @@ func TestGetExecutionConfigsBatch_SingleJob(t *testing.T) {
 	blockchainService := getBlockchainService()
 
 	// Create single test job
-	job := &domain.JobModel{
+	job := &domain.EntityJob{
 		ID:                uuid.New(),
 		AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 		ChainID:           11155111, // Sepolia testnet
@@ -166,7 +166,7 @@ func TestGetExecutionConfigsBatch_SingleJob(t *testing.T) {
 	}
 
 	// Call GetExecutionConfigsBatch
-	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, []*domain.JobModel{job})
+	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, []*domain.EntityJob{job})
 
 	// Verify the call succeeds
 	if err != nil {
@@ -216,7 +216,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsSameChain(t *testing.T) {
 	blockchainService := getBlockchainService()
 
 	// Create multiple test jobs on the same chain
-	jobs := []*domain.JobModel{
+	jobs := []*domain.EntityJob{
 		{
 			ID:                uuid.New(),
 			AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
@@ -271,7 +271,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsDifferentChains(t *testing.T) {
 	blockchainService := getBlockchainService()
 
 	// Create test jobs on different chains
-	jobs := []*domain.JobModel{
+	jobs := []*domain.EntityJob{
 		{
 			ID:                uuid.New(),
 			AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
@@ -326,7 +326,7 @@ func TestGetExecutionConfigsBatch_UnsupportedChain(t *testing.T) {
 	blockchainService := getBlockchainService()
 
 	// Create test job with unsupported chain
-	job := &domain.JobModel{
+	job := &domain.EntityJob{
 		ID:                uuid.New(),
 		AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 		ChainID:           1, // Mainnet - not supported
@@ -336,7 +336,7 @@ func TestGetExecutionConfigsBatch_UnsupportedChain(t *testing.T) {
 	}
 
 	// Call GetExecutionConfigsBatch - should fail
-	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, []*domain.JobModel{job})
+	configs, err := blockchainService.GetExecutionConfigsBatch(ctx, []*domain.EntityJob{job})
 
 	// Verify it returns an error
 	if err == nil {
@@ -358,7 +358,7 @@ func TestGetExecutionConfigsBatch_MixedValidInvalidChains(t *testing.T) {
 	blockchainService := getBlockchainService()
 
 	// Create jobs with mixed valid and invalid chains
-	jobs := []*domain.JobModel{
+	jobs := []*domain.EntityJob{
 		{
 			ID:                uuid.New(),
 			AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),

@@ -92,7 +92,7 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	}
 
 	// Verify the job was actually saved to the database
-	var dbJob domain.JobModel
+	var dbJob domain.EntityJob
 	if err := db.Where("id = ?", job.ID).First(&dbJob).Error; err != nil {
 		t.Fatalf("Failed to find job in database: %v", err)
 	}
