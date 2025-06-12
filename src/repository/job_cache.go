@@ -199,3 +199,35 @@ func (r *JobCacheRepository) GetJobCachesByStatus(ctx context.Context, status Ca
 
 	return jobCaches, nil
 }
+
+// UpdateJobCacheUserOpHash updates the userOpHash for an existing job cache
+func (r *JobCacheRepository) UpdateJobCacheUserOpHash(ctx context.Context, jobID uuid.UUID, userOpHash common.Hash) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	statusKey := fmt.Sprintf("%s:%s", r.statusCache, jobID)
+
+	// Get existing job cache
+	statusData, err := r.redis.Get(ctx, statusKey).Result()
+	if err != nil {
+		return fmt.Errorf("failed to get existing job cache: %w", err)
+	}
+
+	var jobCache JobCache
+	if err := json.Unmarshal([]byte(statusData), &jobCache); err != nil {
+		return fmt.Errorf("failed to unmarshal job cache: %w", err)
+	}
+
+	// Update userOpHash and timestamp
+	jobCache.UserOpHash = userOpHash
+	jobCache.UpdatedAt = time.Now()
+
+	// Marshal and save back to Redis
+	jobData, err := json.Marshal(jobCache)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated job cache: %w", err)
+	}
+
+	// Set with 24-hour expiration
+	return r.redis.Set(ctx, statusKey, jobData, 24*time.Hour).Err()
+}

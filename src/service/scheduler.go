@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"math/big"
 	"sync"
 	"time"
 
@@ -155,20 +154,11 @@ func (js *JobScheduler) pollJobLogic() {
 
 	// Step 5: Enqueue jobs and add to cache
 	for _, job := range jobsToExecute {
-		// Compute userOpHash before enqueuing - direct access instead of GetUserOperation
-		userOp := job.EntityJob.UserOperation
-
-		userOpHash, err := userOp.GetUserOpHashV07(big.NewInt(job.EntityJob.ChainID))
-		if err != nil {
-			logger.Error().Err(err).Str("jobID", job.EntityJob.ID.String()).Msg("Failed to compute user operation hash during enqueue")
-			continue
-		}
-
-		// Add job to cache with pending status
+		// Add job to cache with pending status and nil userOpHash
 		jobCache := &repository.JobCache{
 			JobID:      job.EntityJob.ID,
 			ChainID:    job.EntityJob.ChainID,
-			UserOpHash: userOpHash,
+			UserOpHash: common.Hash{}, // Set to zero hash initially
 			Status:     repository.CacheStatusPending,
 		}
 
@@ -189,7 +179,6 @@ func (js *JobScheduler) pollJobLogic() {
 
 		logger.Info().
 			Str("jobID", job.EntityJob.ID.String()).
-			Str("userOpHash", userOpHash.Hex()).
 			Msg("Job added to cache and enqueued successfully")
 	}
 }
@@ -198,18 +187,6 @@ func (js *JobScheduler) pollJobLogic() {
 func (js *JobScheduler) executeJobLogic(job domain.EntityJob) {
 	logger := js.logger(js.ctx).With().Str("function", "executeJobLogic").Logger()
 	logger.Info().Str("jobID", job.ID.String()).Msg("Executing job...")
-
-	// Job should already be in cache from enqueue phase
-	// Get the cached userOpHash for validation
-	cachedJob, err := js.jobCache.GetJobCache(js.ctx, job.ID)
-	if err != nil {
-		logger.Error().Err(err).Str("jobID", job.ID.String()).Msg("Failed to get job from cache during execution")
-		errMsg := "Job not found in cache during execution"
-		if err := js.jobCache.SetJobStatusFailed(js.ctx, job.ID, errMsg); err != nil {
-			logger.Error().Err(err).Msgf("Failed to set failed job status for %s", job.ID)
-		}
-		return
-	}
 
 	// Execute Job
 	actualUserOpHash, err := js.executionService.ExecuteJob(js.ctx, job)
@@ -229,22 +206,14 @@ func (js *JobScheduler) executeJobLogic(job domain.EntityJob) {
 		logger.Info().
 			Str("jobID", job.ID.String()).
 			Str("actualUserOpHash", actualUserOpHash.Hex()).
-			Str("cachedUserOpHash", cachedJob.UserOpHash.Hex()).
 			Msg("Job executed successfully, user operation sent to network")
 
-		// Verify that cached hash matches actual hash (sanity check)
-		if *actualUserOpHash != cachedJob.UserOpHash {
-			logger.Error().
+		// Update the userOpHash in cache with the actual hash from execution
+		if err := js.jobCache.UpdateJobCacheUserOpHash(js.ctx, job.ID, *actualUserOpHash); err != nil {
+			logger.Error().Err(err).
 				Str("jobID", job.ID.String()).
-				Str("cached", cachedJob.UserOpHash.Hex()).
-				Str("actual", actualUserOpHash.Hex()).
-				Msg("Cached userOpHash differs from actual userOpHash, marking job as failed")
-
-			// Mark job as failed due to hash mismatch
-			errMsg := "Cached userOpHash differs from actual userOpHash"
-			if err := js.jobCache.SetJobStatusFailed(js.ctx, job.ID, errMsg); err != nil {
-				logger.Error().Err(err).Msgf("Failed to set failed job status for %s", job.ID)
-			}
+				Str("actualUserOpHash", actualUserOpHash.Hex()).
+				Msg("Failed to update userOpHash in cache")
 		}
 	} else {
 		// This shouldn't happen - successful execution should return userOpHash
@@ -484,9 +453,16 @@ func (js *JobScheduler) checkSingleJobReceipt(bundlerClient interface{}, job *re
 
 	// Check if UserOpHash is valid (not zero)
 	if job.UserOpHash == (common.Hash{}) {
-		logger.Warn().
+		logger.Error().
 			Str("job_id", job.JobID.String()).
-			Msg("Job has empty user operation hash, skipping receipt check")
+			Msg("Job has empty user operation hash, marking as failed")
+
+		errorMsg := "Job has empty user operation hash"
+		if err := js.jobCache.SetJobStatusFailed(js.ctx, job.JobID, errorMsg); err != nil {
+			logger.Error().Err(err).
+				Str("job_id", job.JobID.String()).
+				Msg("Failed to mark job with invalid userOpHash as failed")
+		}
 		return
 	}
 
