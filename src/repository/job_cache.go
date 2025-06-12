@@ -74,8 +74,8 @@ func (r *JobCacheRepository) DequeueJob(ctx context.Context, timeout time.Durati
 	return &job, nil
 }
 
-// GetJobStatus retrieves the job status from Redis cache
-func (r *JobCacheRepository) GetJobStatus(ctx context.Context, jobID uuid.UUID) (*JobCache, error) {
+// GetJobCache retrieves the job cache by jobID
+func (r *JobCacheRepository) GetJobCache(ctx context.Context, jobID uuid.UUID) (*JobCache, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -116,6 +116,11 @@ func (r *JobCacheRepository) SetJobStatus(ctx context.Context, jobID uuid.UUID, 
 	}
 
 	return r.redis.Set(ctx, statusKey, resultData, 24*time.Hour).Err()
+}
+
+// SetJobStatusFailed sets the job status to failed with an error message
+func (r *JobCacheRepository) SetJobStatusFailed(ctx context.Context, jobID uuid.UUID, errorMessage string) error {
+	return r.SetJobStatus(ctx, jobID, CacheStatusFailed, &errorMessage)
 }
 
 // DeleteJobCache removes the JobCache by jobID from Redis

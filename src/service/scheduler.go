@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"math/big"
 	"sync"
 	"time"
 
@@ -152,19 +153,48 @@ func (js *JobScheduler) pollJobLogic() {
 		return
 	}
 
-	// Step 5: Enqueue jobs and update job cache status
+	// Step 5: Enqueue jobs and add to cache
 	for _, job := range jobsToExecute {
-		// Enqueue the job
-		if err := js.jobCache.EnqueueJob(js.ctx, job.JobModel); err != nil {
-			logger.Error().Err(err).Msgf("Failed to enqueue job %s", job.JobModel.ID)
+		// Compute userOpHash before enqueuing
+		userOp, err := job.JobModel.GetUserOperation()
+		if err != nil {
+			logger.Error().Err(err).Str("jobID", job.JobModel.ID.String()).Msg("Failed to get user operation from job during enqueue")
 			continue
 		}
 
-		// Set job status to pending
-		if err := js.jobCache.SetJobStatus(js.ctx, job.JobModel.ID, repository.CacheStatusPending, nil); err != nil {
-			logger.Error().Err(err).Msgf("Failed to set job status for %s", job.JobModel.ID)
+		userOpHash, err := userOp.GetUserOpHashV07(big.NewInt(job.JobModel.ChainID))
+		if err != nil {
+			logger.Error().Err(err).Str("jobID", job.JobModel.ID.String()).Msg("Failed to compute user operation hash during enqueue")
+			continue
 		}
-		logger.Info().Msgf("Enqueued job: %s", job.JobModel.ID)
+
+		// Add job to cache with pending status
+		jobCache := &repository.JobCache{
+			JobID:      job.JobModel.ID,
+			ChainID:    job.JobModel.ChainID,
+			UserOpHash: userOpHash,
+			Status:     repository.CacheStatusPending,
+		}
+
+		if err := js.jobCache.AddJobCache(js.ctx, jobCache); err != nil {
+			logger.Error().Err(err).Str("jobID", job.JobModel.ID.String()).Msg("Failed to add job to cache during enqueue")
+			continue
+		}
+
+		// Enqueue the job
+		if err := js.jobCache.EnqueueJob(js.ctx, job.JobModel); err != nil {
+			logger.Error().Err(err).Msgf("Failed to enqueue job %s", job.JobModel.ID)
+			// If enqueue fails, remove from cache to maintain consistency
+			if delErr := js.jobCache.DeleteJobCache(js.ctx, job.JobModel.ID); delErr != nil {
+				logger.Error().Err(delErr).Msgf("Failed to cleanup cache after enqueue failure for %s", job.JobModel.ID)
+			}
+			continue
+		}
+
+		logger.Info().
+			Str("jobID", job.JobModel.ID.String()).
+			Str("userOpHash", userOpHash.Hex()).
+			Msg("Job added to cache and enqueued successfully")
 	}
 }
 
@@ -173,22 +203,58 @@ func (js *JobScheduler) executeJobLogic(job domain.JobModel) {
 	logger := js.logger(js.ctx).With().Str("function", "executeJobLogic").Logger()
 	logger.Info().Str("jobID", job.ID.String()).Msg("Executing job...")
 
-	// Step 1: Execute Job
-	userOpHash, err := js.executionService.ExecuteJob(js.ctx, job)
-
-	// Step 2: Update Job Status
-	if userOpHash != nil && err == nil {
-		// delete the job cache since execution was successful
-		if err := js.jobCache.DeleteJobCache(js.ctx, job.ID); err != nil {
-			logger.Error().Err(err).Msgf("Failed to delete job status for %s", job.ID)
+	// Job should already be in cache from enqueue phase
+	// Get the cached userOpHash for validation
+	cachedJob, err := js.jobCache.GetJobCache(js.ctx, job.ID)
+	if err != nil {
+		logger.Error().Err(err).Str("jobID", job.ID.String()).Msg("Failed to get job from cache during execution")
+		errMsg := "Job not found in cache during execution"
+		if err := js.jobCache.SetJobStatusFailed(js.ctx, job.ID, errMsg); err != nil {
+			logger.Error().Err(err).Msgf("Failed to set failed job status for %s", job.ID)
 		}
-		logger.Info().Msgf("Job %s completed successfully and deleted from cache", job.ID)
 		return
-	} else {
+	}
+
+	// Execute Job
+	actualUserOpHash, err := js.executionService.ExecuteJob(js.ctx, job)
+
+	// Update Job Status based on execution result
+	if err != nil {
+		// Execution failed - update cache with failed status and error message
 		errMsg := err.Error()
-		logger.Error().Msgf("Job %s failed: %s", job.ID, errMsg)
-		// Update job status in cache
-		if err := js.jobCache.SetJobStatus(js.ctx, job.ID, repository.CacheStatusFailed, &errMsg); err != nil {
+		logger.Error().Str("jobID", job.ID.String()).Err(err).Msg("Job execution failed")
+
+		if err := js.jobCache.SetJobStatusFailed(js.ctx, job.ID, errMsg); err != nil {
+			logger.Error().Err(err).Msgf("Failed to set failed job status for %s", job.ID)
+		}
+	} else if actualUserOpHash != nil {
+		// Execution successful - user operation sent to network
+		// Keep status as pending, receipt checker will determine final success/failure
+		logger.Info().
+			Str("jobID", job.ID.String()).
+			Str("actualUserOpHash", actualUserOpHash.Hex()).
+			Str("cachedUserOpHash", cachedJob.UserOpHash.Hex()).
+			Msg("Job executed successfully, user operation sent to network")
+
+		// Verify that cached hash matches actual hash (sanity check)
+		if *actualUserOpHash != cachedJob.UserOpHash {
+			logger.Error().
+				Str("jobID", job.ID.String()).
+				Str("cached", cachedJob.UserOpHash.Hex()).
+				Str("actual", actualUserOpHash.Hex()).
+				Msg("Cached userOpHash differs from actual userOpHash, marking job as failed")
+
+			// Mark job as failed due to hash mismatch
+			errMsg := "Cached userOpHash differs from actual userOpHash"
+			if err := js.jobCache.SetJobStatusFailed(js.ctx, job.ID, errMsg); err != nil {
+				logger.Error().Err(err).Msgf("Failed to set failed job status for %s", job.ID)
+			}
+		}
+	} else {
+		// This shouldn't happen - successful execution should return userOpHash
+		logger.Error().Str("jobID", job.ID.String()).Msg("Job execution returned nil userOpHash with no error")
+		errMsg := "Execution returned nil userOpHash with no error"
+		if err := js.jobCache.SetJobStatusFailed(js.ctx, job.ID, errMsg); err != nil {
 			logger.Error().Err(err).Msgf("Failed to set failed job status for %s", job.ID)
 		}
 	}
@@ -258,7 +324,7 @@ func (js *JobScheduler) fetchExecutionConfigsAndFilterJobs(jobs []*domain.JobMod
 
 // isJobInCache checks if a job exists in the Redis cache (regardless of status)
 func (js *JobScheduler) isJobInCache(jobID uuid.UUID) bool {
-	_, err := js.jobCache.GetJobStatus(js.ctx, jobID)
+	_, err := js.jobCache.GetJobCache(js.ctx, jobID)
 	// If no error, job exists in cache
 	// If error is redis.Nil, job doesn't exist in cache
 	// If other error, assume job doesn't exist (conservative approach)
@@ -469,7 +535,7 @@ func (js *JobScheduler) checkSingleJobReceipt(bundlerClient interface{}, job *re
 	} else {
 		// Job failed, update status
 		errorMsg := "User operation failed on-chain"
-		if err := js.jobCache.SetJobStatus(js.ctx, job.JobID, repository.CacheStatusFailed, &errorMsg); err != nil {
+		if err := js.jobCache.SetJobStatusFailed(js.ctx, job.JobID, errorMsg); err != nil {
 			logger.Error().Err(err).
 				Str("job_id", job.JobID.String()).
 				Msg("Failed to update failed job status in cache")

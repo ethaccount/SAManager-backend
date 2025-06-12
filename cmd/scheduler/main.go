@@ -326,8 +326,8 @@ func (js *JobScheduler) getJobsToCheck() []Job {
 	}
 }
 
-// GetJobStatus retrieves the current status of a job
-func (js *JobScheduler) GetJobStatus(jobID string) (*JobCache, error) {
+// GetJobCache retrieves the current status of a job
+func (js *JobScheduler) GetJobCache(jobID string) (*JobCache, error) {
 	statusKey := fmt.Sprintf("%s:%s", js.statusCache, jobID)
 	statusData, err := js.redis.Get(js.ctx, statusKey).Result()
 	if err != nil {
