@@ -183,13 +183,12 @@ func (h *JobHandler) GetJobList(c *gin.Context) {
 		return
 	}
 
-	// Convert domain jobs to response DTOs with formatted time fields
 	jobResponses := make([]JobResponse, len(jobs))
 	for i, job := range jobs {
 		jobResponses[i] = toJobResponse(job)
 	}
 
-	logger.Info().
+	logger.Debug().
 		Int("job_count", len(jobs)).
 		Msg("job list retrieved successfully")
 

@@ -77,16 +77,16 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 	logger.Info().Msg("Database connection established")
 
 	// run migration files
-	migrationPath := "file://migrations"
+	migrationPath := *config.MigrationPath
 
 	MigrationUp(*config.DSN, migrationPath)
 
 	passkeyRepo := repository.NewPasskeyRepository(database)
 
 	webAuthnConfig := &webauthn.Config{
-		RPDisplayName: "Passkey Demo",
-		RPID:          "localhost",
-		RPOrigins:     []string{"http://localhost:" + *config.Port},
+		RPDisplayName: *config.RPDisplayName,
+		RPID:          *config.RPID,
+		RPOrigins:     *config.RPOrigins,
 	}
 
 	passkeyService, err := service.NewPasskeyService(ctx, passkeyRepo, webAuthnConfig, 5*time.Minute)
@@ -237,14 +237,14 @@ func (app *Application) registerRoutes(ctx context.Context, router *gin.Engine) 
 	// Swagger documentation
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	passkeyHandler := handler.NewPasskeyHandler(app.PasskeyService)
+	// passkeyHandler := handler.NewPasskeyHandler(app.PasskeyService)
 	jobHandler := handler.NewJobHandler(app.JobService)
 
 	v1 := router.Group("/api/v1")
 	{
 		v1.GET("/health", handler.HandleHealthCheck)
 
-		v1.POST("/register/begin", passkeyHandler.RegisterBegin())
+		// v1.POST("/register/begin", passkeyHandler.RegisterBegin())
 		// v1.POST("/register/verify", passkeyHandler.RegisterVerify)
 		// v1.POST("/login/options", passkeyHandler.LoginOptions)
 		// v1.POST("/login/verify", passkeyHandler.LoginVerify)
