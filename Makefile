@@ -8,6 +8,9 @@ run:
 build:
 	go build -o bin/samanager cmd/samanager/main.go
 
+run-bin:
+	./bin/samanager
+
 migrate-up:
 	migrate -database $(DB_URL) -path migrations up
 

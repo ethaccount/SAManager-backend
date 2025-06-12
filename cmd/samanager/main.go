@@ -50,8 +50,8 @@ func main() {
 	swagger.SwaggerInfo.Title = AppName + " API"
 	swagger.SwaggerInfo.Version = AppVersion
 	swagger.SwaggerInfo.Description = fmt.Sprintf("%s with automation service and webauthn authentication", AppName)
-	if config.Port != nil {
-		swagger.SwaggerInfo.Host = fmt.Sprintf("localhost:%s", *config.Port)
+	if config.Host != nil {
+		swagger.SwaggerInfo.Host = *config.Host
 	}
 
 	// Create root logger
@@ -66,8 +66,17 @@ func main() {
 		Str("environment", *config.Environment).
 		Msgf("Launching %s", AppName)
 
+	// Build swagger URL based on environment and host config
+	var swaggerURL string
+	if *config.Environment == "dev" {
+		swaggerURL = "http://" + *config.Host + "/swagger/index.html"
+	} else {
+		// For staging/prod, assume HTTPS
+		swaggerURL = "https://" + *config.Host + "/swagger/index.html"
+	}
+
 	logger.Info().
-		Str("swagger_link", "http://localhost:"+*config.Port+"/swagger/index.html").
+		Str("swagger_link", swaggerURL).
 		Msg("Swagger link")
 
 	// ================================

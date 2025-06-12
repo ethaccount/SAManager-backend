@@ -30,6 +30,7 @@ type AppConfig struct {
 
 	// HTTP server configuration
 	Port *string
+	Host *string
 
 	// Polling configuration
 	PollingInterval *int
@@ -114,6 +115,9 @@ func loadOptionalConfig(config *AppConfig) {
 	// HTTP server port (default: 8080)
 	port := getEnvWithDefault("PORT", "8080")
 	config.Port = &port
+
+	// Host configuration - environment aware
+	loadHostConfig(config)
 
 	// Log level (default: debug)
 	// Available levels: "trace", "debug", "info", "warn", "error", "fatal", "panic", "disabled"
@@ -230,4 +234,29 @@ func getEnvWithDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// loadHostConfig handles host configuration with environment-aware defaults
+func loadHostConfig(config *AppConfig) {
+	hostEnv := os.Getenv("HOST")
+	var host string
+
+	if hostEnv != "" {
+		host = hostEnv
+	} else {
+		// Environment-aware defaults
+		switch *config.Environment {
+		case "dev":
+			host = "localhost:" + *config.Port
+		case "staging", "prod":
+			// For deployed environments, assume HTTPS and proper domain
+			// User should set HOST env var for production deployments
+			host = "localhost:" + *config.Port // fallback
+			log.Printf("Warning: HOST environment variable not set for %s environment. Using fallback '%s'. Consider setting HOST for proper deployment.", *config.Environment, host)
+		default:
+			host = "localhost:" + *config.Port
+		}
+	}
+
+	config.Host = &host
 }
