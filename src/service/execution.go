@@ -169,14 +169,8 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.EntityJob)
 		Int64("on_chain_job_id", job.OnChainJobID).
 		Msg("executing job")
 
-	// Get user operation from job
-	userOp, err := job.GetUserOperation()
-	if err != nil {
-		s.logger(ctx).Error().Err(err).
-			Str("job_id", job.ID.String()).
-			Msg("failed to get user operation from job")
-		return nil, fmt.Errorf("failed to get user operation: %w", err)
-	}
+	// Get user operation from job - direct access instead of GetUserOperation
+	userOp := job.UserOperation
 
 	// Get bundler client
 	bundlerClient, err := s.blockchainService.GetBundlerClient(ctx, job.ChainID)
@@ -258,7 +252,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.EntityJob)
 
 	// Estimate gas values
 	entryPointAddress := job.EntryPointAddress
-	estimates, err := bundlerClient.EstimateUserOperationGas(ctx, userOp, entryPointAddress)
+	estimates, err := bundlerClient.EstimateUserOperationGas(ctx, &userOp, entryPointAddress)
 	if err != nil {
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", job.ID.String()).
@@ -341,7 +335,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.EntityJob)
 		Msg("user operation signed successfully")
 
 	// Send the user operation
-	userOpHash, err := bundlerClient.SendUserOperation(ctx, userOp, entryPointAddress)
+	userOpHash, err := bundlerClient.SendUserOperation(ctx, &userOp, entryPointAddress)
 	if err != nil {
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", job.ID.String()).

@@ -67,12 +67,19 @@ type JobResponse struct {
 
 // toJobResponse converts a domain Job to a JobResponse with formatted time fields
 func toJobResponse(job *domain.EntityJob) JobResponse {
+	// Marshal UserOperation to JSON for the response
+	userOpJSON, err := json.Marshal(job.UserOperation)
+	if err != nil {
+		// In case of error, return null
+		userOpJSON = json.RawMessage("null")
+	}
+
 	return JobResponse{
 		ID:                job.ID.String(),
 		AccountAddress:    job.AccountAddress.Hex(),
 		ChainID:           job.ChainID,
 		OnChainJobID:      job.OnChainJobID,
-		UserOperation:     job.UserOperation,
+		UserOperation:     userOpJSON,
 		EntryPointAddress: job.EntryPointAddress.Hex(),
 		CreatedAt:         job.CreatedAt.Format(TimeFormat),
 		UpdatedAt:         job.UpdatedAt.Format(TimeFormat),

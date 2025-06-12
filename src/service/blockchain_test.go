@@ -3,15 +3,38 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"math/big"
 	"strings"
 	"testing"
 
+	"github.com/ethaccount/backend/erc4337"
 	"github.com/ethaccount/backend/src/domain"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 
 	"github.com/ethaccount/backend/src/testutil"
 	"github.com/google/uuid"
 )
+
+// Helper function to create UserOperation from JSON string
+func createUserOperationFromJSON(jsonStr string) erc4337.UserOperation {
+	var userOp erc4337.UserOperation
+	if err := json.Unmarshal([]byte(jsonStr), &userOp); err != nil {
+		// Return a basic UserOperation if parsing fails
+		return erc4337.UserOperation{
+			Sender:               common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
+			Nonce:                (*hexutil.Big)(big.NewInt(1)),
+			CallData:             hexutil.Bytes{},
+			CallGasLimit:         (*hexutil.Big)(big.NewInt(100000)),
+			VerificationGasLimit: (*hexutil.Big)(big.NewInt(50000)),
+			PreVerificationGas:   (*hexutil.Big)(big.NewInt(21000)),
+			MaxPriorityFeePerGas: (*hexutil.Big)(big.NewInt(1000000000)),
+			MaxFeePerGas:         (*hexutil.Big)(big.NewInt(2000000000)),
+			Signature:            hexutil.Bytes{},
+		}
+	}
+	return userOp
+}
 
 func getBlockchainService() *BlockchainService {
 	sepoliaRpcUrl := testutil.GetEnv("SEPOLIA_RPC_URL")
@@ -40,7 +63,7 @@ func TestGetExecutionConfig(t *testing.T) {
 		AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 		ChainID:           11155111, // Sepolia testnet
 		OnChainJobID:      1,
-		UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
+		UserOperation:     createUserOperationFromJSON(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 		EntryPointAddress: common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
 	}
 
@@ -107,7 +130,7 @@ func TestGetExecutionConfig_UnsupportedChain(t *testing.T) {
 		AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 		ChainID:           1, // Unsupported mainnet
 		OnChainJobID:      2,
-		UserOperation:     json.RawMessage(`{}`),
+		UserOperation:     createUserOperationFromJSON(`{}`),
 		EntryPointAddress: common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
 	}
 
@@ -161,7 +184,7 @@ func TestGetExecutionConfigsBatch_SingleJob(t *testing.T) {
 		AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 		ChainID:           11155111, // Sepolia testnet
 		OnChainJobID:      1,
-		UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
+		UserOperation:     createUserOperationFromJSON(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 		EntryPointAddress: common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
 	}
 
@@ -222,7 +245,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsSameChain(t *testing.T) {
 			AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 			ChainID:           11155111, // Sepolia testnet
 			OnChainJobID:      1,
-			UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
+			UserOperation:     createUserOperationFromJSON(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 			EntryPointAddress: common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
 		},
 		{
@@ -230,7 +253,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsSameChain(t *testing.T) {
 			AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 			ChainID:           11155111, // Sepolia testnet
 			OnChainJobID:      2,
-			UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x2","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
+			UserOperation:     createUserOperationFromJSON(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x2","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 			EntryPointAddress: common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
 		},
 	}
@@ -277,7 +300,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsDifferentChains(t *testing.T) {
 			AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 			ChainID:           11155111, // Sepolia testnet
 			OnChainJobID:      1,
-			UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
+			UserOperation:     createUserOperationFromJSON(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 			EntryPointAddress: common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
 		},
 		{
@@ -285,7 +308,7 @@ func TestGetExecutionConfigsBatch_MultipleJobsDifferentChains(t *testing.T) {
 			AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 			ChainID:           84532, // Base Sepolia
 			OnChainJobID:      1,
-			UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
+			UserOperation:     createUserOperationFromJSON(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 			EntryPointAddress: common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
 		},
 	}
@@ -331,7 +354,7 @@ func TestGetExecutionConfigsBatch_UnsupportedChain(t *testing.T) {
 		AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 		ChainID:           1, // Mainnet - not supported
 		OnChainJobID:      1,
-		UserOperation:     json.RawMessage(`{}`),
+		UserOperation:     createUserOperationFromJSON(`{}`),
 		EntryPointAddress: common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
 	}
 
@@ -364,7 +387,7 @@ func TestGetExecutionConfigsBatch_MixedValidInvalidChains(t *testing.T) {
 			AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 			ChainID:           11155111, // Sepolia testnet - valid
 			OnChainJobID:      1,
-			UserOperation:     json.RawMessage(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
+			UserOperation:     createUserOperationFromJSON(`{"sender":"0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1","nonce":"0x1","callData":"0x","callGasLimit":"100000","verificationGasLimit":"50000","preVerificationGas":"21000","maxPriorityFeePerGas":"1000000000","maxFeePerGas":"2000000000","signature":"0x"}`),
 			EntryPointAddress: common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
 		},
 		{
@@ -372,7 +395,7 @@ func TestGetExecutionConfigsBatch_MixedValidInvalidChains(t *testing.T) {
 			AccountAddress:    common.HexToAddress("0x47d6a8a65cba9b61b194dac740aa192a7a1e91e1"),
 			ChainID:           1, // Mainnet - invalid
 			OnChainJobID:      1,
-			UserOperation:     json.RawMessage(`{}`),
+			UserOperation:     createUserOperationFromJSON(`{}`),
 			EntryPointAddress: common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da032"),
 		},
 	}

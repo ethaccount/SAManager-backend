@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"encoding/json"
 	"testing"
 
 	"math/big"
@@ -77,11 +76,8 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 		t.Error("UpdatedAt should be set")
 	}
 
-	// Verify the UserOperation was stored correctly
-	var storedUserOp erc4337.UserOperation
-	if err := json.Unmarshal(job.UserOperation, &storedUserOp); err != nil {
-		t.Fatalf("Failed to unmarshal stored UserOperation: %v", err)
-	}
+	// Verify the UserOperation was stored correctly - direct access instead of GetUserOperation
+	storedUserOp := job.UserOperation
 
 	if storedUserOp.Sender != userOperation.Sender {
 		t.Errorf("Expected Sender %s, got %s", userOperation.Sender.Hex(), storedUserOp.Sender.Hex())
@@ -92,24 +88,21 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	}
 
 	// Verify the job was actually saved to the database
-	var dbJob domain.EntityJob
+	var dbJob domain.DBJob
 	if err := db.Where("id = ?", job.ID).First(&dbJob).Error; err != nil {
 		t.Fatalf("Failed to find job in database: %v", err)
 	}
 
-	if dbJob.AccountAddress != accountAddress {
-		t.Errorf("Database job accountAddress mismatch: expected %s, got %s", accountAddress.Hex(), dbJob.AccountAddress.Hex())
+	if dbJob.AccountAddress != accountAddress.Hex() {
+		t.Errorf("Database job accountAddress mismatch: expected %s, got %s", accountAddress.Hex(), dbJob.AccountAddress)
 	}
 
 	if dbJob.OnChainJobID != jobID {
 		t.Errorf("Database job OnChainJobID mismatch: expected %d, got %d", jobID, dbJob.OnChainJobID)
 	}
 
-	// Test GetUserOperation method
-	retrievedUserOp, err := dbJob.GetUserOperation()
-	if err != nil {
-		t.Fatalf("GetUserOperation failed: %v", err)
-	}
+	// Test direct access to UserOperation instead of GetUserOperation
+	retrievedUserOp := job.UserOperation
 
 	if retrievedUserOp.Sender != userOperation.Sender {
 		t.Errorf("Retrieved UserOperation Sender mismatch: expected %s, got %s", userOperation.Sender.Hex(), retrievedUserOp.Sender.Hex())

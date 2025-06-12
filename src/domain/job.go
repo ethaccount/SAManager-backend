@@ -40,12 +40,17 @@ func (DBJob) TableName() string {
 
 // ToEntityJob converts DBJob to EntityJob
 func (j *DBJob) ToEntityJob() (*EntityJob, error) {
+	var userOp erc4337.UserOperation
+	if err := json.Unmarshal(j.UserOperation, &userOp); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal user operation: %w", err)
+	}
+
 	return &EntityJob{
 		ID:                j.ID,
 		AccountAddress:    common.HexToAddress(j.AccountAddress),
 		ChainID:           j.ChainID,
 		OnChainJobID:      j.OnChainJobID,
-		UserOperation:     j.UserOperation,
+		UserOperation:     userOp,
 		EntryPointAddress: common.HexToAddress(j.EntryPointAddress),
 		Status:            j.Status,
 		ErrMsg:            j.ErrMsg,
@@ -60,7 +65,7 @@ type EntityJob struct {
 	AccountAddress    common.Address
 	ChainID           int64
 	OnChainJobID      int64
-	UserOperation     json.RawMessage
+	UserOperation     erc4337.UserOperation
 	EntryPointAddress common.Address
 	Status            DBJobStatus
 	ErrMsg            *string
@@ -68,28 +73,24 @@ type EntityJob struct {
 	UpdatedAt         time.Time
 }
 
-func (rj *EntityJob) ToDBJob() *DBJob {
+func (rj *EntityJob) ToDBJob() (*DBJob, error) {
+	userOpJSON, err := json.Marshal(rj.UserOperation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal user operation: %w", err)
+	}
+
 	return &DBJob{
 		ID:                rj.ID,
 		AccountAddress:    rj.AccountAddress.Hex(),
 		ChainID:           rj.ChainID,
 		OnChainJobID:      rj.OnChainJobID,
-		UserOperation:     rj.UserOperation,
+		UserOperation:     userOpJSON,
 		EntryPointAddress: rj.EntryPointAddress.Hex(),
 		Status:            rj.Status,
 		ErrMsg:            rj.ErrMsg,
 		CreatedAt:         rj.CreatedAt,
 		UpdatedAt:         rj.UpdatedAt,
-	}
-}
-
-// GetUserOperation returns the user operation as a typed struct
-func (rj *EntityJob) GetUserOperation() (*erc4337.UserOperation, error) {
-	var userOp erc4337.UserOperation
-	if err := json.Unmarshal(rj.UserOperation, &userOp); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal user operation: %w", err)
-	}
-	return &userOp, nil
+	}, nil
 }
 
 // ExecutionConfig represents the job configuration from the blockchain

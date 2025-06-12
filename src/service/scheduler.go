@@ -155,12 +155,8 @@ func (js *JobScheduler) pollJobLogic() {
 
 	// Step 5: Enqueue jobs and add to cache
 	for _, job := range jobsToExecute {
-		// Compute userOpHash before enqueuing
-		userOp, err := job.EntityJob.GetUserOperation()
-		if err != nil {
-			logger.Error().Err(err).Str("jobID", job.EntityJob.ID.String()).Msg("Failed to get user operation from job during enqueue")
-			continue
-		}
+		// Compute userOpHash before enqueuing - direct access instead of GetUserOperation
+		userOp := job.EntityJob.UserOperation
 
 		userOpHash, err := userOp.GetUserOpHashV07(big.NewInt(job.EntityJob.ChainID))
 		if err != nil {
