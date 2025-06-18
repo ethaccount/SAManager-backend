@@ -38,7 +38,7 @@ func TestJobRepository_RegisterJob(t *testing.T) {
 	}
 
 	// Test CreateJob
-	job, err := repo.CreateJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
+	job, err := repo.CreateJob(accountAddress, chainId, jobID, domain.DBJobTypeTransfer, userOperation, entryPointAddress)
 	if err != nil {
 		t.Fatalf("CreateJob failed: %v", err)
 	}
@@ -128,13 +128,13 @@ func TestJobRepository_RegisterJob_DuplicateJobID(t *testing.T) {
 	}
 
 	// Register first job
-	_, err := repo.CreateJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
+	_, err := repo.CreateJob(accountAddress, chainId, jobID, domain.DBJobTypeTransfer, userOperation, entryPointAddress)
 	if err != nil {
 		t.Fatalf("First CreateJob failed: %v", err)
 	}
 
 	// Try to register duplicate job (same account_address and job_id)
-	_, err = repo.CreateJob(accountAddress, chainId, jobID, userOperation, entryPointAddress)
+	_, err = repo.CreateJob(accountAddress, chainId, jobID, domain.DBJobTypeTransfer, userOperation, entryPointAddress)
 	if err == nil {
 		t.Error("Expected error when registering duplicate job, but got none")
 	}

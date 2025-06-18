@@ -18,6 +18,7 @@ import (
 
 const (
 	scheduledTransfersAddress = "0xA8E374779aeE60413c974b484d6509c7E4DDb6bA"
+	scheduledOrdersAddress    = "0x40dc90D670C89F322fa8b9f685770296428DCb6b"
 )
 
 type BlockchainConfig struct {
@@ -77,11 +78,24 @@ func (b *BlockchainService) GetClient(chainId int64) (*ethclient.Client, error) 
 	return client, nil
 }
 
+// getContractAddress returns the appropriate contract address based on job type
+func (b *BlockchainService) getContractAddress(jobType domain.DBJobType) (string, error) {
+	switch jobType {
+	case domain.DBJobTypeTransfer:
+		return scheduledTransfersAddress, nil
+	case domain.DBJobTypeSwap:
+		return scheduledOrdersAddress, nil
+	default:
+		return "", fmt.Errorf("unsupported job type: %s", jobType)
+	}
+}
+
 func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.EntityJob) (*domain.ExecutionConfig, error) {
 	b.logger(ctx).Debug().
 		Str("account_address", job.AccountAddress.Hex()).
 		Int64("chain_id", job.ChainID).
 		Int64("job_id", int64(job.OnChainJobID)).
+		Str("job_type", string(job.JobType)).
 		Msg("getting execution config for job")
 
 	client, err := b.GetClient(job.ChainID)
@@ -89,6 +103,15 @@ func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.
 		b.logger(ctx).Error().Err(err).
 			Int64("chain_id", job.ChainID).
 			Msg("failed to get blockchain client")
+		return nil, err
+	}
+
+	// Get the appropriate contract address based on job type
+	contractAddress, err := b.getContractAddress(job.JobType)
+	if err != nil {
+		b.logger(ctx).Error().Err(err).
+			Str("job_type", string(job.JobType)).
+			Msg("failed to get contract address for job type")
 		return nil, err
 	}
 
@@ -108,16 +131,17 @@ func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.
 	}
 
 	// Make the call
-	addr := common.HexToAddress(scheduledTransfersAddress)
+	addr := common.HexToAddress(contractAddress)
 	result, err := client.CallContract(context.Background(), ethereum.CallMsg{
 		To:   &addr,
 		Data: calldata,
 	}, nil)
 	if err != nil {
 		b.logger(ctx).Error().Err(err).
-			Str("contract_address", scheduledTransfersAddress).
+			Str("contract_address", contractAddress).
 			Str("account_address", job.AccountAddress.Hex()).
 			Int64("job_id", int64(job.OnChainJobID)).
+			Str("job_type", string(job.JobType)).
 			Msg("failed to call contract")
 		return nil, err
 	}
@@ -145,6 +169,7 @@ func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.
 	b.logger(ctx).Debug().
 		Str("account_address", job.AccountAddress.Hex()).
 		Int64("job_id", int64(job.OnChainJobID)).
+		Str("job_type", string(job.JobType)).
 		Bool("is_enabled", config.IsEnabled).
 		Uint16("executions_completed", config.NumberOfExecutionsCompleted).
 		Uint16("total_executions", config.NumberOfExecutions).
@@ -154,7 +179,7 @@ func (b *BlockchainService) GetExecutionConfig(ctx context.Context, job *domain.
 }
 
 // GetExecutionConfigsBatch retrieves execution configs for multiple jobs in batch
-// Groups jobs by chain ID and makes batch calls for efficiency
+// Groups jobs by chain ID and job type, then makes batch calls for efficiency
 func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs []*domain.EntityJob) (map[string]*domain.ExecutionConfig, error) {
 	b.logger(ctx).Debug().
 		Int("job_count", len(jobs)).
@@ -164,32 +189,47 @@ func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs [
 		return make(map[string]*domain.ExecutionConfig), nil
 	}
 
-	// Group jobs by chain ID for batch processing
-	jobsByChain := make(map[int64][]*domain.EntityJob)
+	// Group jobs by chain ID and job type for batch processing
+	type chainJobTypeKey struct {
+		chainId int64
+		jobType domain.DBJobType
+	}
+	jobsByChainAndType := make(map[chainJobTypeKey][]*domain.EntityJob)
 	for _, job := range jobs {
-		jobsByChain[job.ChainID] = append(jobsByChain[job.ChainID], job)
+		key := chainJobTypeKey{chainId: job.ChainID, jobType: job.JobType}
+		jobsByChainAndType[key] = append(jobsByChainAndType[key], job)
 	}
 
 	b.logger(ctx).Debug().
-		Int("chain_count", len(jobsByChain)).
-		Msg("grouped jobs by chain for batch processing")
+		Int("chain_type_combinations", len(jobsByChainAndType)).
+		Msg("grouped jobs by chain and type for batch processing")
 
 	results := make(map[string]*domain.ExecutionConfig)
 
-	// Process each chain separately
-	for chainId, chainJobs := range jobsByChain {
+	// Process each chain-type combination separately
+	for key, chainTypeJobs := range jobsByChainAndType {
 		b.logger(ctx).Debug().
-			Int64("chain_id", chainId).
-			Int("jobs_for_chain", len(chainJobs)).
-			Msg("processing jobs for chain")
+			Int64("chain_id", key.chainId).
+			Str("job_type", string(key.jobType)).
+			Int("jobs_for_chain_type", len(chainTypeJobs)).
+			Msg("processing jobs for chain and type")
 
-		client, err := b.GetClient(chainId)
+		client, err := b.GetClient(key.chainId)
 		if err != nil {
 			b.logger(ctx).Error().Err(err).
-				Int64("chain_id", chainId).
+				Int64("chain_id", key.chainId).
 				Msg("failed to get client for chain")
 			// Return error for unsupported chains
-			return nil, fmt.Errorf("failed to get client for chain %d: %w", chainId, err)
+			return nil, fmt.Errorf("failed to get client for chain %d: %w", key.chainId, err)
+		}
+
+		// Get the appropriate contract address based on job type
+		contractAddress, err := b.getContractAddress(key.jobType)
+		if err != nil {
+			b.logger(ctx).Error().Err(err).
+				Str("job_type", string(key.jobType)).
+				Msg("failed to get contract address for job type")
+			return nil, fmt.Errorf("failed to get contract address for job type %s: %w", key.jobType, err)
 		}
 
 		// ABI for executionLog(address,uint256)
@@ -197,10 +237,10 @@ func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs [
 		parsedABI, _ := abi.JSON(strings.NewReader(contractABI))
 
 		// Prepare batch calls
-		calls := make([]ethereum.CallMsg, len(chainJobs))
-		jobKeys := make([]string, len(chainJobs))
+		calls := make([]ethereum.CallMsg, len(chainTypeJobs))
+		jobKeys := make([]string, len(chainTypeJobs))
 
-		for i, job := range chainJobs {
+		for i, job := range chainTypeJobs {
 			calldata, err := parsedABI.Pack("executionLog", job.AccountAddress, big.NewInt(int64(job.OnChainJobID)))
 			if err != nil {
 				b.logger(ctx).Error().Err(err).
@@ -210,7 +250,7 @@ func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs [
 				return nil, fmt.Errorf("failed to pack calldata for job %s: %w", job.ID.String(), err)
 			}
 
-			addr := common.HexToAddress(scheduledTransfersAddress)
+			addr := common.HexToAddress(contractAddress)
 			calls[i] = ethereum.CallMsg{
 				To:   &addr,
 				Data: calldata,
@@ -224,7 +264,9 @@ func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs [
 			if err != nil {
 				b.logger(ctx).Error().Err(err).
 					Str("job_id", jobKeys[i]).
-					Int64("chain_id", chainId).
+					Int64("chain_id", key.chainId).
+					Str("job_type", string(key.jobType)).
+					Str("contract_address", contractAddress).
 					Msg("failed to call contract for job")
 				return nil, fmt.Errorf("failed to call contract for job %s: %w", jobKeys[i], err)
 			}
@@ -250,9 +292,10 @@ func (b *BlockchainService) GetExecutionConfigsBatch(ctx context.Context, jobs [
 		}
 
 		b.logger(ctx).Debug().
-			Int64("chain_id", chainId).
-			Int("processed_jobs", len(chainJobs)).
-			Msg("successfully processed all jobs for chain")
+			Int64("chain_id", key.chainId).
+			Str("job_type", string(key.jobType)).
+			Int("processed_jobs", len(chainTypeJobs)).
+			Msg("successfully processed all jobs for chain and type")
 	}
 
 	b.logger(ctx).Info().

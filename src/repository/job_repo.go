@@ -17,7 +17,7 @@ func NewJobRepository(db *gorm.DB) *JobRepository {
 	return &JobRepository{db: db}
 }
 
-func (r *JobRepository) CreateJob(accountAddress common.Address, chainId int64, jobID int64, userOperation *erc4337.UserOperation, entryPoint common.Address) (*domain.EntityJob, error) {
+func (r *JobRepository) CreateJob(accountAddress common.Address, chainId int64, jobID int64, jobType domain.DBJobType, userOperation *erc4337.UserOperation, entryPoint common.Address) (*domain.EntityJob, error) {
 	userOpJSON, err := json.Marshal(userOperation)
 	if err != nil {
 		return nil, err
@@ -29,6 +29,7 @@ func (r *JobRepository) CreateJob(accountAddress common.Address, chainId int64, 
 		OnChainJobID:      jobID,
 		UserOperation:     userOpJSON,
 		EntryPointAddress: entryPoint.Hex(),
+		JobType:           jobType,
 		Status:            domain.DBJobStatusQueuing,
 	}
 

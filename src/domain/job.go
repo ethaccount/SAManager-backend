@@ -20,6 +20,14 @@ const (
 	DBJobStatusFailed    DBJobStatus = "failed"
 )
 
+// DBJobType represents the type of a job in the database
+type DBJobType string
+
+const (
+	DBJobTypeTransfer DBJobType = "transfer"
+	DBJobTypeSwap     DBJobType = "swap"
+)
+
 // DBJob represents a job in the database (persistence layer)
 type DBJob struct {
 	ID                uuid.UUID       `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
@@ -28,6 +36,7 @@ type DBJob struct {
 	OnChainJobID      int64           `gorm:"not null" json:"onChainJobId"`
 	UserOperation     json.RawMessage `gorm:"type:jsonb;not null" json:"userOperation"`
 	EntryPointAddress string          `gorm:"type:varchar(42);not null" json:"entryPointAddress"`
+	JobType           DBJobType       `gorm:"type:varchar(20);not null;default:transfer;check:job_type IN ('transfer', 'swap')" json:"jobType"`
 	Status            DBJobStatus     `gorm:"type:varchar(20);not null;default:queuing;check:status IN ('queuing', 'completed', 'failed')" json:"status"`
 	ErrMsg            *string         `gorm:"type:text" json:"errMsg,omitempty"`
 	CreatedAt         time.Time       `gorm:"not null;default:CURRENT_TIMESTAMP" json:"createdAt"`
@@ -52,6 +61,7 @@ func (j *DBJob) ToEntityJob() (*EntityJob, error) {
 		OnChainJobID:      j.OnChainJobID,
 		UserOperation:     userOp,
 		EntryPointAddress: common.HexToAddress(j.EntryPointAddress),
+		JobType:           j.JobType,
 		Status:            j.Status,
 		ErrMsg:            j.ErrMsg,
 		CreatedAt:         j.CreatedAt,
@@ -67,6 +77,7 @@ type EntityJob struct {
 	OnChainJobID      int64
 	UserOperation     erc4337.UserOperation
 	EntryPointAddress common.Address
+	JobType           DBJobType
 	Status            DBJobStatus
 	ErrMsg            *string
 	CreatedAt         time.Time
@@ -86,6 +97,7 @@ func (rj *EntityJob) ToDBJob() (*DBJob, error) {
 		OnChainJobID:      rj.OnChainJobID,
 		UserOperation:     userOpJSON,
 		EntryPointAddress: rj.EntryPointAddress.Hex(),
+		JobType:           rj.JobType,
 		Status:            rj.Status,
 		ErrMsg:            rj.ErrMsg,
 		CreatedAt:         rj.CreatedAt,

@@ -37,6 +37,7 @@ type RegisterJobRequest struct {
 	AccountAddress string                 `json:"accountAddress" binding:"required" example:"0x1234567890123456789012345678901234567890"`
 	ChainID        int64                  `json:"chainId" binding:"required" example:"11155111"`
 	JobID          int64                  `json:"jobId" binding:"required" example:"1"`
+	JobType        string                 `json:"jobType" binding:"required" example:"transfer"`
 	UserOperation  *erc4337.UserOperation `json:"userOperation" binding:"required"`
 	EntryPoint     string                 `json:"entryPoint" binding:"required" example:"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"`
 }
@@ -47,6 +48,7 @@ type RegisterJobResponse struct {
 	AccountAddress string `json:"accountAddress" example:"0x1234567890123456789012345678901234567890"`
 	ChainID        int64  `json:"chainId" example:"11155111"`
 	JobID          int64  `json:"jobId" example:"1"`
+	JobType        string `json:"jobType" example:"transfer"`
 	EntryPoint     string `json:"entryPoint" example:"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"`
 	CreatedAt      string `json:"createdAt" example:"2025-01-09 13:36:56"`
 	UpdatedAt      string `json:"updatedAt" example:"2025-01-09 13:36:56"`
@@ -59,6 +61,7 @@ type JobResponse struct {
 	AccountAddress    string          `json:"accountAddress" example:"0x1234567890123456789012345678901234567890"`
 	ChainID           int64           `json:"chainId" example:"11155111"`
 	OnChainJobID      int64           `json:"onChainJobId" example:"1"`
+	JobType           string          `json:"jobType" example:"transfer"`
 	UserOperation     json.RawMessage `json:"userOperation"`
 	EntryPointAddress string          `json:"entryPointAddress" example:"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"`
 	CreatedAt         string          `json:"createdAt" example:"2025-01-09 13:36:56"`
@@ -79,6 +82,7 @@ func toJobResponse(job *domain.EntityJob) JobResponse {
 		AccountAddress:    job.AccountAddress.Hex(),
 		ChainID:           job.ChainID,
 		OnChainJobID:      job.OnChainJobID,
+		JobType:           string(job.JobType),
 		UserOperation:     userOpJSON,
 		EntryPointAddress: job.EntryPointAddress.Hex(),
 		CreatedAt:         job.CreatedAt.Format(TimeFormat),
@@ -114,6 +118,19 @@ func (h *JobHandler) RegisterJob(c *gin.Context) {
 		return
 	}
 
+	// Validate job type
+	if req.JobType == "" {
+		logger.Error().Msg("missing job type")
+		respondWithError(c, domain.NewError(domain.ErrorCodeParameterInvalid, errors.New("missing job type"), domain.WithMsg("jobType is required")))
+		return
+	}
+
+	if req.JobType != string(domain.DBJobTypeTransfer) && req.JobType != string(domain.DBJobTypeSwap) {
+		logger.Error().Str("jobType", req.JobType).Msg("invalid job type")
+		respondWithError(c, domain.NewError(domain.ErrorCodeParameterInvalid, errors.New("invalid job type"), domain.WithMsg("jobType must be 'transfer' or 'swap'")))
+		return
+	}
+
 	// Validate and parse addresses
 	if !common.IsHexAddress(req.AccountAddress) {
 		logger.Error().Str("accountAddress", req.AccountAddress).Msg("invalid account address format")
@@ -135,6 +152,7 @@ func (h *JobHandler) RegisterJob(c *gin.Context) {
 		accountAddress,
 		req.ChainID,
 		req.JobID,
+		domain.DBJobType(req.JobType),
 		req.UserOperation,
 		entryPointAddress,
 	)
@@ -148,6 +166,7 @@ func (h *JobHandler) RegisterJob(c *gin.Context) {
 		AccountAddress: job.AccountAddress.Hex(),
 		ChainID:        job.ChainID,
 		JobID:          job.OnChainJobID,
+		JobType:        string(job.JobType),
 		EntryPoint:     job.EntryPointAddress.Hex(),
 		CreatedAt:      job.CreatedAt.Format(TimeFormat),
 		UpdatedAt:      job.UpdatedAt.Format(TimeFormat),
