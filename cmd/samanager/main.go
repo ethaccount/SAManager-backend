@@ -40,7 +40,7 @@ const (
 func main() {
 	// Load .env file if it exists (optional in production)
 	if _, err := os.Stat(".env"); err == nil {
-		err := godotenv.Load()
+		err := godotenv.Overload(".env")
 		if err != nil {
 			log.Fatalf("Error loading .env file: %v", err)
 		}
