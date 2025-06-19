@@ -3,8 +3,11 @@ package app
 import (
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/ethaccount/backend/src/utils"
 )
 
 type AppConfig struct {
@@ -128,8 +131,8 @@ func loadOptionalConfig(config *AppConfig) {
 	pollingInterval := getPollingInterval()
 	config.PollingInterval = &pollingInterval
 
-	// Migration path (default: file://migrations)
-	migrationPath := getEnvWithDefault("MIGRATION_PATH", "file://migrations")
+	// Migration path
+	migrationPath := getEnvWithDefault("MIGRATION_PATH", "file://"+filepath.Join(utils.FindProjectRoot(), "migrations"))
 	config.MigrationPath = &migrationPath
 
 	// Load WebAuthn configuration

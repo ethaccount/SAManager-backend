@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
+	"github.com/ethaccount/backend/src/utils"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -16,25 +16,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func findProjectRoot() string {
-	_, filename, _, _ := runtime.Caller(0)
-	dir := filepath.Dir(filename)
-
-	// Walk up the directory tree to find go.mod
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Reached filesystem root without finding go.mod
-			panic("Could not find project root (go.mod not found)")
-		}
-		dir = parent
-	}
-}
-
-var migrationPath = "file://" + filepath.Join(findProjectRoot(), "migrations")
+var migrationPath = "file://" + filepath.Join(utils.FindProjectRoot(), "migrations")
 
 func SetupTestDB(t *testing.T) *gorm.DB {
 	err := godotenv.Load("../../.env")
