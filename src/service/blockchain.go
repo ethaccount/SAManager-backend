@@ -56,17 +56,18 @@ func (b *BlockchainService) logger(ctx context.Context) *zerolog.Logger {
 func (b *BlockchainService) GetClient(chainId int64) (*ethclient.Client, error) {
 	var rpcUrl string
 
-	if chainId == 11155111 {
+	switch chainId {
+	case 11155111:
 		rpcUrl = *b.SepoliaRPCURL
-	} else if chainId == 42161 {
+	case 42161:
 		rpcUrl = *b.ArbitrumSepoliaRPCURL
-	} else if chainId == 84532 {
+	case 84532:
 		rpcUrl = *b.BaseSepoliaRPCURL
-	} else if chainId == 1101 {
+	case 1101:
 		rpcUrl = *b.OptimismSepoliaRPCURL
-	} else if chainId == 137 {
+	case 137:
 		rpcUrl = *b.PolygonAmoyRPCURL
-	} else {
+	default:
 		return nil, fmt.Errorf("unsupported chain id: %d", chainId)
 	}
 
