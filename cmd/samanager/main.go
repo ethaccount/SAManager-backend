@@ -34,7 +34,7 @@ import (
 
 const (
 	AppName    = "SAManager Backend"
-	AppVersion = "0.0.1"
+	AppVersion = "0.1.0"
 )
 
 func main() {
