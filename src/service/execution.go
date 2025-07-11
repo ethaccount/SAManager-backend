@@ -233,13 +233,15 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.EntityJob)
 	// Update user operation with current nonce
 	userOp.Nonce = (*hexutil.Big)(currentNonce)
 
-	// Set paymaster (hardcoded for now, could be configurable)
+	// Set Public Paymaster (hardcoded for now, could be configurable)
 	paymaster := common.HexToAddress("0xcD1c62f36A99f306948dB76c35Bbc1A639f92ce8")
 	userOp.Paymaster = &paymaster
+	userOp.PaymasterPostOpGasLimit = (*hexutil.Big)(big.NewInt(0))
 
-	// Add dummy signature for gas estimation
-	dummySignature := "0xfffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c"
-	decodedDummySignature, err := hexutil.Decode(dummySignature)
+	// Extract leading signature (part before dummy signature)
+	// The dummy signature is 65 bytes (130 hex chars), so we need to extract everything before it
+	dummySignature := "fffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c"
+	dummySignatureBytes, err := hex.DecodeString(dummySignature)
 	if err != nil {
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", job.ID.String()).
@@ -247,10 +249,27 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.EntityJob)
 		return nil, fmt.Errorf("failed to decode dummy signature: %w", err)
 	}
 
-	leadingSignature := userOp.Signature
-	userOp.Signature = append(userOp.Signature, decodedDummySignature...)
+	// Find the dummy signature in the user operation signature
+	userOpSignatureHex := hex.EncodeToString(userOp.Signature)
+	dummyIndex := len(userOpSignatureHex) - len(dummySignature)
+	if dummyIndex < 0 || userOpSignatureHex[dummyIndex:] != dummySignature {
+		s.logger(ctx).Error().
+			Str("job_id", job.ID.String()).
+			Str("signature", userOpSignatureHex).
+			Str("expected_dummy", dummySignature).
+			Msg("dummy signature not found at expected position")
+		return nil, fmt.Errorf("dummy signature not found at expected position in user operation signature")
+	}
 
-	// Estimate gas values
+	// Extract leading signature (everything before the dummy signature)
+	leadingSignature := userOp.Signature[:len(userOp.Signature)-len(dummySignatureBytes)]
+
+	s.logger(ctx).Debug().
+		Str("job_id", job.ID.String()).
+		Str("leading_signature", hex.EncodeToString(leadingSignature)).
+		Msg("extracted leading signature")
+
+	// Estimate gas values (userOp.Signature already contains dummy signature from frontend)
 	entryPointAddress := job.EntryPointAddress
 	estimates, err := bundlerClient.EstimateUserOperationGas(ctx, &userOp, entryPointAddress)
 	if err != nil {
@@ -326,7 +345,7 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.EntityJob)
 		Str("signature", "0x"+hex.EncodeToString(signature)).
 		Msg("generated signature")
 
-	// Update the signature in the user operation (preserve any existing signature prefix)
+	// Replace dummy signature with real signature (preserve leading signature prefix)
 	userOp.Signature = append(leadingSignature, signature...)
 
 	s.logger(ctx).Debug().
