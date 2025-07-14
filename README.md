@@ -1,5 +1,8 @@
 # SAManager Backend
 
+- Staging Endpoints: https://samanager-backend.onrender.com/swagger/index.html
+- SAManager: https://github.com/ethaccount/SAManager
+
 ### test
 
 ```
