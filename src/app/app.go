@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"reflect"
 	"sync"
@@ -36,42 +35,37 @@ type Application struct {
 	Scheduler      *service.JobScheduler
 }
 
-func NewApplication(ctx context.Context, config AppConfig) *Application {
+func NewApplication(ctx context.Context, config AppConfig) (*Application, error) {
 	logger := zerolog.Ctx(ctx).With().Str("function", "NewApplication").Logger()
 
 	// Connect to Redis
 	redisOpts, err := redis.ParseURL(*config.RedisURL)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to parse redis URL")
-		return nil
+		return nil, fmt.Errorf("failed to parse redis URL: %w", err)
 	}
 
 	rdb := redis.NewClient(redisOpts)
 
 	// Test Redis connection
 	if err := rdb.Ping(ctx).Err(); err != nil {
-		logger.Error().Err(err).Msg("connection to redis failed")
-		return nil
+		return nil, fmt.Errorf("connection to redis failed: %w", err)
 	}
 	logger.Info().Msg("Redis connection established")
 
 	// Connect to database
 	database, err := gorm.Open(postgresDriver.Open(*config.DSN), &gorm.Config{})
 	if err != nil {
-		logger.Error().Err(err).Msg("connection to database failed")
-		return nil
+		return nil, fmt.Errorf("connection to database failed: %w", err)
 	}
 
 	// Test database connection
 	db, err := database.DB()
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to get underlying database connection")
-		return nil
+		return nil, fmt.Errorf("failed to get underlying database connection: %w", err)
 	}
 
 	if err := db.Ping(); err != nil {
-		logger.Error().Err(err).Msg("connection to database failed")
-		return nil
+		return nil, fmt.Errorf("connection to database failed: %w", err)
 	}
 
 	logger.Info().Msg("Database connection established")
@@ -91,8 +85,7 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 
 	passkeyService, err := service.NewPasskeyService(ctx, passkeyRepo, webAuthnConfig, 5*time.Minute)
 	if err != nil {
-		logger.Error().Err(err).Msg("creation of passkey service failed")
-		return nil
+		return nil, fmt.Errorf("creation of passkey service failed: %w", err)
 	}
 
 	jobRepo := repository.NewJobRepository(database)
@@ -108,7 +101,7 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 
 	executionService, err := service.NewExecutionService(blockchainService, *config.PrivateKey)
 	if err != nil {
-		log.Fatalf("failed to create execution service: %v", err)
+		return nil, fmt.Errorf("failed to create execution service: %w", err)
 	}
 
 	jobCache := repository.NewJobCacheRepository(rdb, "job_queue")
@@ -121,7 +114,7 @@ func NewApplication(ctx context.Context, config AppConfig) *Application {
 		PasskeyService: passkeyService,
 		JobService:     jobService,
 		Scheduler:      scheduler,
-	}
+	}, nil
 }
 
 func (app *Application) Shutdown(ctx context.Context) {

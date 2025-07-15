@@ -85,7 +85,11 @@ func main() {
 	// Start application
 	// ================================
 
-	app := app.NewApplication(rootCtx, *config)
+	app, err := app.NewApplication(rootCtx, *config)
+	if err != nil {
+		logger.Error().Err(err).Msg("Failed to initialize application")
+		return
+	}
 
 	wg := sync.WaitGroup{}
 
