@@ -59,13 +59,13 @@ func (b *BlockchainService) GetClient(chainId int64) (*ethclient.Client, error) 
 	switch chainId {
 	case 11155111:
 		rpcUrl = *b.SepoliaRPCURL
-	case 42161:
+	case 421614:
 		rpcUrl = *b.ArbitrumSepoliaRPCURL
 	case 84532:
 		rpcUrl = *b.BaseSepoliaRPCURL
-	case 1101:
+	case 11155420:
 		rpcUrl = *b.OptimismSepoliaRPCURL
-	case 137:
+	case 80002:
 		rpcUrl = *b.PolygonAmoyRPCURL
 	default:
 		return nil, fmt.Errorf("unsupported chain id: %d", chainId)
