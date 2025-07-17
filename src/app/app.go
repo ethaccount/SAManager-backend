@@ -27,12 +27,13 @@ import (
 )
 
 type Application struct {
-	config         AppConfig
-	database       *gorm.DB
-	redis          *redis.Client
-	PasskeyService *service.PasskeyService
-	JobService     *service.JobService
-	Scheduler      *service.JobScheduler
+	config            AppConfig
+	database          *gorm.DB
+	redis             *redis.Client
+	PasskeyService    *service.PasskeyService
+	JobService        *service.JobService
+	BlockchainService *service.BlockchainService
+	Scheduler         *service.JobScheduler
 }
 
 func NewApplication(ctx context.Context, config AppConfig) (*Application, error) {
@@ -121,12 +122,13 @@ func NewApplication(ctx context.Context, config AppConfig) (*Application, error)
 	scheduler := service.NewJobScheduler(ctx, jobCache, *config.PollingInterval, jobService, executionService, blockchainService)
 
 	return &Application{
-		config:         config,
-		database:       database,
-		redis:          rdb,
-		PasskeyService: passkeyService,
-		JobService:     jobService,
-		Scheduler:      scheduler,
+		config:            config,
+		database:          database,
+		redis:             rdb,
+		PasskeyService:    passkeyService,
+		JobService:        jobService,
+		BlockchainService: blockchainService,
+		Scheduler:         scheduler,
 	}, nil
 }
 
@@ -154,6 +156,12 @@ func (app *Application) Shutdown(ctx context.Context) {
 		} else {
 			logger.Info().Msg("Redis connection closed")
 		}
+	}
+
+	// Close BlockchainService connections
+	if app.BlockchainService != nil {
+		app.BlockchainService.Close()
+		logger.Info().Msg("BlockchainService connections closed")
 	}
 }
 

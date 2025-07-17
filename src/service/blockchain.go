@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 
 	"github.com/ethaccount/backend/erc4337"
 	"github.com/ethaccount/backend/src/domain"
@@ -35,6 +36,8 @@ type BlockchainService struct {
 	BaseSepoliaRPCURL     *string
 	OptimismSepoliaRPCURL *string
 	PolygonAmoyRPCURL     *string
+	clientPool            map[int64]*ethclient.Client
+	mu                    sync.RWMutex
 }
 
 func NewBlockchainService(config BlockchainConfig) *BlockchainService {
@@ -44,6 +47,7 @@ func NewBlockchainService(config BlockchainConfig) *BlockchainService {
 		BaseSepoliaRPCURL:     &config.BaseSepoliaRPCURL,
 		OptimismSepoliaRPCURL: &config.OptimismSepoliaRPCURL,
 		PolygonAmoyRPCURL:     &config.PolygonAmoyRPCURL,
+		clientPool:            make(map[int64]*ethclient.Client),
 	}
 }
 
@@ -54,6 +58,21 @@ func (b *BlockchainService) logger(ctx context.Context) *zerolog.Logger {
 }
 
 func (b *BlockchainService) GetClient(chainId int64) (*ethclient.Client, error) {
+	b.mu.RLock()
+	if client, exists := b.clientPool[chainId]; exists {
+		b.mu.RUnlock()
+		return client, nil
+	}
+	b.mu.RUnlock()
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// Double-check pattern
+	if client, exists := b.clientPool[chainId]; exists {
+		return client, nil
+	}
+
 	var rpcUrl string
 
 	switch chainId {
@@ -76,7 +95,23 @@ func (b *BlockchainService) GetClient(chainId int64) (*ethclient.Client, error) 
 		return nil, err
 	}
 
+	if b.clientPool == nil {
+		b.clientPool = make(map[int64]*ethclient.Client)
+	}
+	b.clientPool[chainId] = client
+
 	return client, nil
+}
+
+// Close closes all client connections and cleans up the connection pool
+func (b *BlockchainService) Close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	for _, client := range b.clientPool {
+		client.Close()
+	}
+	b.clientPool = nil
 }
 
 // getContractAddress returns the appropriate contract address based on job type
