@@ -58,6 +58,19 @@ func NewApplication(ctx context.Context, config AppConfig) (*Application, error)
 		return nil, fmt.Errorf("connection to database failed: %w", err)
 	}
 
+	// Configure connection pool for Supabase free plan
+	sqlDB, err := database.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get underlying database connection: %w", err)
+	}
+
+	// Configuration for Supabase shared pooler
+	// @docs shared pooler https://supabase.com/docs/guides/database/connecting-to-postgres#shared-pooler
+	sqlDB.SetMaxOpenConns(20)
+	sqlDB.SetMaxIdleConns(5)
+	sqlDB.SetConnMaxLifetime(10 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(2 * time.Minute)
+
 	// Test database connection
 	db, err := database.DB()
 	if err != nil {
