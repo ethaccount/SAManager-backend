@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"syscall"
 	"time"
@@ -102,8 +105,12 @@ func main() {
 	go app.RunPollingWorker(rootCtx, &wg)
 
 	wg.Add(1)
-	go runMemoryStatsLogger(rootCtx, &wg, logger)
+	go runSystemStatsLogger(rootCtx, &wg, logger)
 
+	if *config.Environment == "dev" {
+		wg.Add(1)
+		go runPprofServer(rootCtx, &wg, logger)
+	}
 	// ================================
 
 	// Setup signal handling for graceful shutdown
@@ -137,8 +144,44 @@ func main() {
 	logger.Info().Msg("Application shutdown complete")
 }
 
-// runMemoryStatsLogger logs memory statistics periodically
-func runMemoryStatsLogger(ctx context.Context, wg *sync.WaitGroup, logger zerolog.Logger) {
+// runPprofServer starts a debug server with pprof endpoints
+func runPprofServer(ctx context.Context, wg *sync.WaitGroup, logger zerolog.Logger) {
+	defer wg.Done()
+
+	// Use the default mux which has pprof endpoints automatically registered
+	server := &http.Server{
+		Addr:    ":6060",
+		Handler: http.DefaultServeMux,
+	}
+
+	// Start server in goroutine
+	go func() {
+		logger.Info().Msg("pprof server is running on http://localhost:6060/debug/pprof/")
+		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			logger.Error().Err(err).Msg("Failed to start pprof server")
+		}
+	}()
+
+	// Wait for context cancellation
+	<-ctx.Done()
+
+	logger.Info().Msg("Gracefully shutting down pprof server...")
+
+	// Create shutdown context with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+
+	// Shutdown server
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Error().Err(err).Msg("Failed to shutdown pprof server gracefully")
+	} else {
+		logger.Info().Msg("pprof server shutdown complete")
+	}
+}
+
+// runSystemStatsLogger logs system statistics periodically
+func runSystemStatsLogger(ctx context.Context, wg *sync.WaitGroup, logger zerolog.Logger) {
 	defer wg.Done()
 
 	ticker := time.NewTicker(5 * time.Second)
@@ -147,7 +190,7 @@ func runMemoryStatsLogger(ctx context.Context, wg *sync.WaitGroup, logger zerolo
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info().Msg("Memory stats logger shutting down")
+			logger.Info().Msg("System stats logger shutting down")
 			return
 		case <-ticker.C:
 			var m runtime.MemStats
@@ -155,7 +198,15 @@ func runMemoryStatsLogger(ctx context.Context, wg *sync.WaitGroup, logger zerolo
 			logger.Info().
 				Uint64("heap_mb", m.HeapInuse/1024/1024).
 				Uint64("sys_mb", m.Sys/1024/1024).
-				Msg("Memory stats")
+				Int("goroutines", runtime.NumGoroutine()).
+				Msg("System stats")
+
+			var gcStats debug.GCStats
+			debug.ReadGCStats(&gcStats)
+			logger.Info().
+				Int64("gc_num", gcStats.NumGC).
+				Int64("gc_pause_total", int64(gcStats.PauseTotal)).
+				Msg("GC stats")
 		}
 	}
 }
