@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/ethaccount/backend/docs/swagger"
+	"github.com/rs/zerolog"
 )
 
 // @termsOfService  http://swagger.io/terms/
@@ -34,7 +36,7 @@ import (
 
 const (
 	AppName    = "SAManager Backend"
-	AppVersion = "0.1.2"
+	AppVersion = "0.1.3"
 )
 
 func main() {
@@ -99,6 +101,9 @@ func main() {
 	wg.Add(1)
 	go app.RunPollingWorker(rootCtx, &wg)
 
+	wg.Add(1)
+	go runMemoryStatsLogger(rootCtx, &wg, logger)
+
 	// ================================
 
 	// Setup signal handling for graceful shutdown
@@ -130,4 +135,27 @@ func main() {
 	app.Shutdown(rootCtx)
 
 	logger.Info().Msg("Application shutdown complete")
+}
+
+// runMemoryStatsLogger logs memory statistics periodically
+func runMemoryStatsLogger(ctx context.Context, wg *sync.WaitGroup, logger zerolog.Logger) {
+	defer wg.Done()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info().Msg("Memory stats logger shutting down")
+			return
+		case <-ticker.C:
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			logger.Info().
+				Uint64("heap_mb", m.HeapInuse/1024/1024).
+				Uint64("sys_mb", m.Sys/1024/1024).
+				Msg("Memory stats")
+		}
+	}
 }
