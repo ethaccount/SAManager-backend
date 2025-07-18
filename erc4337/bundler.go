@@ -52,6 +52,7 @@ type Bundler interface {
 	EstimateUserOperationGas(ctx context.Context, op *UserOperation, entryPoint common.Address) (*GasEstimates, error)
 	SendUserOperation(ctx context.Context, op *UserOperation, entryPoint common.Address) (common.Hash, error)
 	GetUserOperationReceipt(ctx context.Context, userOpHash common.Hash) (*UserOperationReceipt, error)
+	Close()
 }
 
 type BundlerClient struct {
@@ -154,4 +155,11 @@ func (b *BundlerClient) WaitForUserOpReceipt(ctx context.Context, userOpHash com
 	}
 
 	return nil, fmt.Errorf("failed to get user operation receipt for %s after %d attempts", userOpHash, maxAttempts)
+}
+
+// Close closes the underlying RPC connection
+func (b *BundlerClient) Close() {
+	if b.client != nil {
+		b.client.Close()
+	}
 }

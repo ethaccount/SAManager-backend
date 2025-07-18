@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/rs/zerolog"
 )
 
@@ -37,6 +38,7 @@ type BlockchainService struct {
 	OptimismSepoliaRPCURL *string
 	PolygonAmoyRPCURL     *string
 	clientPool            map[int64]*ethclient.Client
+	bundlerClientPool     map[int64]erc4337.Bundler
 	mu                    sync.RWMutex
 }
 
@@ -48,6 +50,7 @@ func NewBlockchainService(config BlockchainConfig) *BlockchainService {
 		OptimismSepoliaRPCURL: &config.OptimismSepoliaRPCURL,
 		PolygonAmoyRPCURL:     &config.PolygonAmoyRPCURL,
 		clientPool:            make(map[int64]*ethclient.Client),
+		bundlerClientPool:     make(map[int64]erc4337.Bundler),
 	}
 }
 
@@ -103,6 +106,15 @@ func (b *BlockchainService) GetClient(chainId int64) (*ethclient.Client, error) 
 	return client, nil
 }
 
+// GetRPCClient returns the underlying RPC client from the pooled eth client
+func (b *BlockchainService) GetRPCClient(ctx context.Context, chainId int64) (*rpc.Client, error) {
+	ethClient, err := b.GetClient(chainId)
+	if err != nil {
+		return nil, err
+	}
+	return ethClient.Client(), nil
+}
+
 // Close closes all client connections and cleans up the connection pool
 func (b *BlockchainService) Close() {
 	b.mu.Lock()
@@ -112,6 +124,12 @@ func (b *BlockchainService) Close() {
 		client.Close()
 	}
 	b.clientPool = nil
+
+	// Close bundler clients
+	for _, bundler := range b.bundlerClientPool {
+		bundler.Close()
+	}
+	b.bundlerClientPool = nil
 }
 
 // getContractAddress returns the appropriate contract address based on job type
@@ -362,9 +380,27 @@ func (b *BlockchainService) GetBundlerURL(chainId int64) (string, error) {
 
 // GetBundlerClient returns a bundler client for a given chain ID
 func (b *BlockchainService) GetBundlerClient(ctx context.Context, chainId int64) (erc4337.Bundler, error) {
+	b.mu.RLock()
+	if bundler, exists := b.bundlerClientPool[chainId]; exists {
+		b.mu.RUnlock()
+		b.logger(ctx).Debug().
+			Int64("chain_id", chainId).
+			Msg("using cached bundler client")
+		return bundler, nil
+	}
+	b.mu.RUnlock()
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// Double-check pattern
+	if bundler, exists := b.bundlerClientPool[chainId]; exists {
+		return bundler, nil
+	}
+
 	b.logger(ctx).Debug().
 		Int64("chain_id", chainId).
-		Msg("creating bundler client")
+		Msg("creating new bundler client")
 
 	bundlerURL, err := b.GetBundlerURL(chainId)
 	if err != nil {
@@ -383,10 +419,15 @@ func (b *BlockchainService) GetBundlerClient(ctx context.Context, chainId int64)
 		return nil, fmt.Errorf("failed to create bundler client for chain %d: %w", chainId, err)
 	}
 
+	if b.bundlerClientPool == nil {
+		b.bundlerClientPool = make(map[int64]erc4337.Bundler)
+	}
+	b.bundlerClientPool[chainId] = bundlerClient
+
 	b.logger(ctx).Debug().
 		Int64("chain_id", chainId).
 		Str("bundler_url", bundlerURL).
-		Msg("successfully created bundler client")
+		Msg("successfully created and cached bundler client")
 
 	return bundlerClient, nil
 }

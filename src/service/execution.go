@@ -182,26 +182,15 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.EntityJob)
 		return nil, fmt.Errorf("failed to get bundler client: %w", err)
 	}
 
-	// Get bundler URL for RPC client
-	bundlerURL, err := s.blockchainService.GetBundlerURL(job.ChainID)
+	// Get RPC client from the blockchain service pool
+	rpcClient, err := s.blockchainService.GetRPCClient(ctx, job.ChainID)
 	if err != nil {
 		s.logger(ctx).Error().Err(err).
 			Str("job_id", job.ID.String()).
 			Int64("chain_id", job.ChainID).
-			Msg("failed to get bundler URL")
-		return nil, fmt.Errorf("failed to get bundler URL: %w", err)
+			Msg("failed to get RPC client")
+		return nil, fmt.Errorf("failed to get RPC client: %w", err)
 	}
-
-	// Create RPC client for direct blockchain calls
-	rpcClient, err := rpc.DialContext(ctx, bundlerURL)
-	if err != nil {
-		s.logger(ctx).Error().Err(err).
-			Str("job_id", job.ID.String()).
-			Str("bundler_url", bundlerURL).
-			Msg("failed to create RPC client")
-		return nil, fmt.Errorf("failed to create RPC client: %w", err)
-	}
-	defer rpcClient.Close()
 
 	// Extract nonce key and get current nonce from entrypoint
 	nonceKey, err := extractNonceKey(userOp.Nonce)
