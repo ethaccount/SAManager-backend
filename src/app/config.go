@@ -52,6 +52,10 @@ type AppConfig struct {
 	BaseSepoliaRPCURL     *string
 	OptimismSepoliaRPCURL *string
 	PolygonAmoyRPCURL     *string
+
+	// Mainnet RPC URLs
+	ArbitrumRPCURL *string
+	BaseRPCURL     *string
 }
 
 func NewAppConfig() *AppConfig {
@@ -214,6 +218,13 @@ func loadRPCConfig(config *AppConfig) {
 
 	polygonAmoyRPCURL := getEnvWithDefault("POLYGON_AMOY_RPC_URL", "https://polygon-amoy-rpc.publicnode.com")
 	config.PolygonAmoyRPCURL = &polygonAmoyRPCURL
+
+	// Mainnet RPC URLs
+	arbitrumRPCURL := getEnvWithDefault("ARBITRUM_RPC_URL", "https://arbitrum-one-rpc.publicnode.com")
+	config.ArbitrumRPCURL = &arbitrumRPCURL
+
+	baseRPCURL := getEnvWithDefault("BASE_RPC_URL", "https://base-rpc.publicnode.com")
+	config.BaseRPCURL = &baseRPCURL
 }
 
 // getPollingInterval parses polling interval from environment with default fallback

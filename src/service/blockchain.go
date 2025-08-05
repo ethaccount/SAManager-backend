@@ -29,6 +29,10 @@ type BlockchainConfig struct {
 	BaseSepoliaRPCURL     string
 	OptimismSepoliaRPCURL string
 	PolygonAmoyRPCURL     string
+
+	// Mainnet URLs
+	ArbitrumRPCURL string
+	BaseRPCURL     string
 }
 
 type BlockchainService struct {
@@ -37,9 +41,14 @@ type BlockchainService struct {
 	BaseSepoliaRPCURL     *string
 	OptimismSepoliaRPCURL *string
 	PolygonAmoyRPCURL     *string
-	clientPool            map[int64]*ethclient.Client
-	bundlerClientPool     map[int64]erc4337.Bundler
-	mu                    sync.RWMutex
+
+	// Mainnet URLs
+	ArbitrumRPCURL *string
+	BaseRPCURL     *string
+
+	clientPool        map[int64]*ethclient.Client
+	bundlerClientPool map[int64]erc4337.Bundler
+	mu                sync.RWMutex
 }
 
 func NewBlockchainService(config BlockchainConfig) *BlockchainService {
@@ -49,8 +58,13 @@ func NewBlockchainService(config BlockchainConfig) *BlockchainService {
 		BaseSepoliaRPCURL:     &config.BaseSepoliaRPCURL,
 		OptimismSepoliaRPCURL: &config.OptimismSepoliaRPCURL,
 		PolygonAmoyRPCURL:     &config.PolygonAmoyRPCURL,
-		clientPool:            make(map[int64]*ethclient.Client),
-		bundlerClientPool:     make(map[int64]erc4337.Bundler),
+
+		// Mainnet URLs
+		ArbitrumRPCURL: &config.ArbitrumRPCURL,
+		BaseRPCURL:     &config.BaseRPCURL,
+
+		clientPool:        make(map[int64]*ethclient.Client),
+		bundlerClientPool: make(map[int64]erc4337.Bundler),
 	}
 }
 
@@ -79,16 +93,20 @@ func (b *BlockchainService) GetClient(chainId int64) (*ethclient.Client, error) 
 	var rpcUrl string
 
 	switch chainId {
-	case 11155111:
+	case 11155111: // Sepolia
 		rpcUrl = *b.SepoliaRPCURL
-	case 421614:
+	case 421614: // Arbitrum Sepolia
 		rpcUrl = *b.ArbitrumSepoliaRPCURL
-	case 84532:
+	case 84532: // Base Sepolia
 		rpcUrl = *b.BaseSepoliaRPCURL
-	case 11155420:
+	case 11155420: // Optimism Sepolia
 		rpcUrl = *b.OptimismSepoliaRPCURL
-	case 80002:
+	case 80002: // Polygon Amoy
 		rpcUrl = *b.PolygonAmoyRPCURL
+	case 42161: // Arbitrum One
+		rpcUrl = *b.ArbitrumRPCURL
+	case 8453: // Base
+		rpcUrl = *b.BaseRPCURL
 	default:
 		return nil, fmt.Errorf("unsupported chain id: %d", chainId)
 	}
@@ -373,6 +391,10 @@ func (b *BlockchainService) GetBundlerURL(chainId int64) (string, error) {
 		return *b.OptimismSepoliaRPCURL, nil
 	case 80002: // Polygon Amoy
 		return *b.PolygonAmoyRPCURL, nil
+	case 42161: // Arbitrum One
+		return *b.ArbitrumRPCURL, nil
+	case 8453: // Base
+		return *b.BaseRPCURL, nil
 	default:
 		return "", fmt.Errorf("unsupported chain id for bundler: %d", chainId)
 	}

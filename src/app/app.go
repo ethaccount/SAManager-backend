@@ -111,6 +111,10 @@ func NewApplication(ctx context.Context, config AppConfig) (*Application, error)
 		BaseSepoliaRPCURL:     *config.BaseSepoliaRPCURL,
 		OptimismSepoliaRPCURL: *config.OptimismSepoliaRPCURL,
 		PolygonAmoyRPCURL:     *config.PolygonAmoyRPCURL,
+
+		// Mainnet URLs
+		ArbitrumRPCURL: *config.ArbitrumRPCURL,
+		BaseRPCURL:     *config.BaseRPCURL,
 	})
 
 	executionService, err := service.NewExecutionService(blockchainService, *config.PrivateKey)
