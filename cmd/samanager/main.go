@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ethaccount/backend/src/app"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/joho/godotenv"
 
 	"github.com/ethaccount/backend/docs/swagger"
@@ -39,7 +40,7 @@ import (
 
 const (
 	AppName    = "SAManager Backend"
-	AppVersion = "0.1.4"
+	AppVersion = "0.1.5"
 )
 
 func main() {
@@ -68,9 +69,17 @@ func main() {
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	rootCtx = logger.WithContext(rootCtx)
 
+	// Log session signer address
+	privateKey, err := crypto.HexToECDSA(*config.PrivateKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	signerAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
+
 	logger.Info().
 		Str("version", AppVersion).
 		Str("environment", *config.Environment).
+		Str("session_signer_address", signerAddress.Hex()).
 		Msgf("Launching %s", AppName)
 
 	// Build swagger URL based on environment and host config
