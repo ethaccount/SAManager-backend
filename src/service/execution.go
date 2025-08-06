@@ -222,11 +222,6 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.EntityJob)
 	// Update user operation with current nonce
 	userOp.Nonce = (*hexutil.Big)(currentNonce)
 
-	// Set Public Paymaster (hardcoded for now, could be configurable)
-	paymaster := common.HexToAddress("0xcD1c62f36A99f306948dB76c35Bbc1A639f92ce8")
-	userOp.Paymaster = &paymaster
-	userOp.PaymasterPostOpGasLimit = (*hexutil.Big)(big.NewInt(0))
-
 	// Extract leading signature (part before dummy signature)
 	// The dummy signature is 65 bytes (130 hex chars), so we need to extract everything before it
 	dummySignature := "fffffffffffffffffffffffffffffff0000000000000000000000000000000007aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1c"
@@ -290,9 +285,13 @@ func (s *ExecutionService) ExecuteJob(ctx context.Context, job domain.EntityJob)
 	userOp.PreVerificationGas = (*hexutil.Big)(estimates.PreVerificationGas)
 	userOp.VerificationGasLimit = (*hexutil.Big)(estimates.VerificationGasLimit)
 	userOp.CallGasLimit = (*hexutil.Big)(estimates.CallGasLimit)
-	userOp.PaymasterVerificationGasLimit = (*hexutil.Big)(estimates.PaymasterVerificationGasLimit)
 	userOp.MaxFeePerGas = (*hexutil.Big)(maxFeePerGas)
 	userOp.MaxPriorityFeePerGas = (*hexutil.Big)(maxPriorityFeePerGas)
+
+	// Only set paymaster fields if we're using a paymaster
+	if userOp.Paymaster != nil {
+		userOp.PaymasterVerificationGasLimit = (*hexutil.Big)(estimates.PaymasterVerificationGasLimit)
+	}
 
 	// Calculate user operation hash for signing
 	hash, err := userOp.GetUserOpHashV07(big.NewInt(job.ChainID))

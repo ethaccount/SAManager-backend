@@ -18,18 +18,18 @@ var EntryPointV07 = common.HexToAddress("0x0000000071727De22E5E9d8BAf0edAc6f37da
 type UserOperation struct {
 	Sender                        common.Address  `json:"sender"`
 	Nonce                         *hexutil.Big    `json:"nonce"`
-	Factory                       *common.Address `json:"factory"`
-	FactoryData                   hexutil.Bytes   `json:"factoryData"`
+	Factory                       *common.Address `json:"factory,omitempty"`
+	FactoryData                   hexutil.Bytes   `json:"factoryData,omitempty"`
 	CallData                      hexutil.Bytes   `json:"callData"`
 	CallGasLimit                  *hexutil.Big    `json:"callGasLimit"`
 	VerificationGasLimit          *hexutil.Big    `json:"verificationGasLimit"`
 	PreVerificationGas            *hexutil.Big    `json:"preVerificationGas"`
 	MaxPriorityFeePerGas          *hexutil.Big    `json:"maxPriorityFeePerGas"`
 	MaxFeePerGas                  *hexutil.Big    `json:"maxFeePerGas"`
-	Paymaster                     *common.Address `json:"paymaster"`
-	PaymasterVerificationGasLimit *hexutil.Big    `json:"paymasterVerificationGasLimit"`
-	PaymasterPostOpGasLimit       *hexutil.Big    `json:"paymasterPostOpGasLimit"`
-	PaymasterData                 hexutil.Bytes   `json:"paymasterData"`
+	Paymaster                     *common.Address `json:"paymaster,omitempty"`
+	PaymasterVerificationGasLimit *hexutil.Big    `json:"paymasterVerificationGasLimit,omitempty"`
+	PaymasterPostOpGasLimit       *hexutil.Big    `json:"paymasterPostOpGasLimit,omitempty"`
+	PaymasterData                 hexutil.Bytes   `json:"paymasterData,omitempty"`
 	Signature                     hexutil.Bytes   `json:"signature"`
 }
 
@@ -43,8 +43,8 @@ func (uo *UserOperation) MarshalJSON() ([]byte, error) {
 		PreVerificationGas            string `json:"preVerificationGas"`
 		MaxPriorityFeePerGas          string `json:"maxPriorityFeePerGas"`
 		MaxFeePerGas                  string `json:"maxFeePerGas"`
-		PaymasterVerificationGasLimit string `json:"paymasterVerificationGasLimit"`
-		PaymasterPostOpGasLimit       string `json:"paymasterPostOpGasLimit"`
+		PaymasterVerificationGasLimit string `json:"paymasterVerificationGasLimit,omitempty"`
+		PaymasterPostOpGasLimit       string `json:"paymasterPostOpGasLimit,omitempty"`
 		*Alias
 	}{
 		Alias: (*Alias)(uo),
@@ -98,8 +98,8 @@ func (uo *UserOperation) UnmarshalJSON(data []byte) error {
 		PreVerificationGas            string `json:"preVerificationGas"`
 		MaxPriorityFeePerGas          string `json:"maxPriorityFeePerGas"`
 		MaxFeePerGas                  string `json:"maxFeePerGas"`
-		PaymasterVerificationGasLimit string `json:"paymasterVerificationGasLimit"`
-		PaymasterPostOpGasLimit       string `json:"paymasterPostOpGasLimit"`
+		PaymasterVerificationGasLimit string `json:"paymasterVerificationGasLimit,omitempty"`
+		PaymasterPostOpGasLimit       string `json:"paymasterPostOpGasLimit,omitempty"`
 		*Alias
 	}{
 		Alias: (*Alias)(uo),

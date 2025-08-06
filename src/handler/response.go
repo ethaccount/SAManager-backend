@@ -91,23 +91,6 @@ func respondWithError(c *gin.Context, err error) {
 	c.AbortWithStatusJSON(domainErr.HTTPStatus(), response)
 }
 
-// respondWithCustomError sends a custom error response
-func respondWithCustomError(c *gin.Context, httpStatus int, code int, message string, errorDetail interface{}) {
-	response := StandardResponse{
-		Code:    code,
-		Message: message,
-		Error:   errorDetail,
-	}
-
-	ctx := c.Request.Context()
-	zerolog.Ctx(ctx).Error().
-		Str("function", "respondWithCustomError").
-		Int("error_code", code).
-		Msg(message)
-
-	c.AbortWithStatusJSON(httpStatus, response)
-}
-
 // parseDomainError extracts domain error information
 func parseDomainError(err error) domain.DomainError {
 	var domainError domain.DomainError
